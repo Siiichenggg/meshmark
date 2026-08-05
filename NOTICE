@@ -1,0 +1,12 @@
+meshmark bundles
+================
+
+meshmark itself is MIT licensed; see LICENSE.
+
+Bundles built by this tool contain a copy of three.js (MIT, Copyright (c)
+2010-2025 three.js authors), taken from the installation the build was pointed
+at. three.js is not redistributed in this repository.
+
+The bundle directory that `meshmark build` writes is yours. It contains a
+copy of whatever mesh you pointed it at, under whatever terms that mesh
+carries -- meshmark makes no claim on it and does not check it.

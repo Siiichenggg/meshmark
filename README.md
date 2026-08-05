@@ -239,5 +239,7 @@ it happens again.
 
 ## Licence
 
-MIT. Bundles you build contain a copy of three.js (also MIT) taken from your own
+MIT — see [LICENSE](LICENSE), and [NOTICE](NOTICE) for what a built bundle contains.
+
+Bundles you build contain a copy of three.js (also MIT) taken from your own
 installation; three.js is not redistributed in this repository.

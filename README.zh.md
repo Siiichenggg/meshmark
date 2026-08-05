@@ -223,5 +223,7 @@ JavaScript 放在 `.js` 文件里而不是塞在一个 Python 字符串里，这
 
 ## 许可
 
-MIT。你构建出来的包里包含一份 three.js（同为 MIT），取自你自己的安装；
+MIT —— 见 [LICENSE](LICENSE)，构建产物包含什么见 [NOTICE](NOTICE)。
+
+你构建出来的包里包含一份 three.js（同为 MIT），取自你自己的安装；
 本仓库不再分发 three.js。
