@@ -83,14 +83,14 @@ pip install -e .
 meshmark build scan.glb --out .annotate/room
 
 # 手术室，中文界面，对照已有真值，并把机器人起始位姿画成固定参考点
-meshmark build halo.glb --out .annotate/halo \
-    --scene halo \
+meshmark build or_room.glb --out .annotate/or_room \
+    --scene or_room \
     --classes operating-room \
     --lang zh \
-    --targets gt_halo.json \
+    --targets gt_or_room.json \
     --reference "robot_start=-1.35,-1.9"
 
-meshmark serve .annotate/halo --open
+meshmark serve .annotate/or_room --open
 ```
 
 `serve` 只绑定 `127.0.0.1`。一个包里带着它所指向的那份网格的副本，
@@ -122,16 +122,16 @@ meshmark serve .annotate/halo --open
 {
   "format": "meshmark/annotations",
   "version": 1,
-  "scene": "halo",
+  "scene": "or_room",
   "source": {
-    "mesh": "halo.glb",
+    "mesh": "or_room.glb",
     "floor_z_m": 0.1079,
     "floor_source": "measured from the mesh",
     "plate": { "pixels": 2048, "metres_per_pixel": 0.00333, "centre_xy": [0, 0] }
   },
   "objects": [
     {
-      "object_id": "halo_cart_001",
+      "object_id": "or_room_cart_001",
       "class_id": "cart",
       "label": "cart",
       "label_zh": "推车",
