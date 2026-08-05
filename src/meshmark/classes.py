@@ -77,6 +77,25 @@ def load(name_or_path: str) -> dict:
                 f"{where} ({cid}) needs size_m as three positive numbers "
                 f"[width, depth, height] in metres, got {size!r}"
             )
+        # Optional other names for the same thing, so a reference file saying
+        # "operating bed" resolves to the class rather than inventing one.
+        aliases = c.get("aliases", [])
+        if not isinstance(aliases, list) or not all(isinstance(a, str) and a for a in aliases):
+            raise PresetError(f"{where} ({cid}): aliases must be a list of strings")
+
+    # Checked across the whole preset rather than per class: an alias that also
+    # names another class makes which one a reference file resolves to depend on
+    # iteration order, which is a bug that only shows up on someone else's data.
+    claimed: dict[str, str] = {}
+    for c in classes:
+        for name in [c["id"], *c.get("aliases", [])]:
+            key = name.strip().lower()
+            owner = claimed.get(key)
+            if owner and owner != c["id"]:
+                raise PresetError(
+                    f"{path}: {name!r} is claimed by both {owner!r} and {c['id']!r}"
+                )
+            claimed[key] = c["id"]
 
     data.setdefault("name", path.stem)
     data.setdefault("display", {lang: data["name"] for lang in LANGS})

@@ -77,6 +77,33 @@ def test_the_shipped_examples_are_valid():
     assert len(targets.load(root / "examples/targets.json")) == 3
 
 
+def test_an_alias_claimed_by_two_classes_is_rejected(tmp_path: Path):
+    # Otherwise which class a reference file resolves to depends on iteration
+    # order -- a bug that only ever shows up on someone else's data.
+    p = write(tmp_path / "p.json", {"classes": [
+        {"id": "table", "en": "t", "zh": "桌", "size_m": [1, 1, 1], "aliases": ["bench"]},
+        {"id": "counter", "en": "c", "zh": "台", "size_m": [1, 1, 1], "aliases": ["Bench"]},
+    ]})
+    with pytest.raises(classes.PresetError, match="claimed by both"):
+        classes.load(p)
+
+
+def test_an_alias_may_not_shadow_another_classes_id(tmp_path: Path):
+    p = write(tmp_path / "p.json", {"classes": [
+        {"id": "table", "en": "t", "zh": "桌", "size_m": [1, 1, 1]},
+        {"id": "counter", "en": "c", "zh": "台", "size_m": [1, 1, 1], "aliases": ["table"]},
+    ]})
+    with pytest.raises(classes.PresetError, match="claimed by both"):
+        classes.load(p)
+
+
+def test_the_operating_room_preset_claims_the_names_real_files_use():
+    preset = classes.load("operating-room")
+    claimed = {a.lower() for c in preset["classes"] for a in c.get("aliases", [])}
+    for name in ("operating bed", "patient monitor", "trolley"):
+        assert name in claimed, f"{name} would become a class of its own"
+
+
 def test_a_preset_missing_a_translation_is_rejected(tmp_path: Path):
     # A zh name quietly defaulting to the English one gives a UI that looks
     # translated and is not -- worse than a build that stops.

@@ -61,7 +61,12 @@ const CLASSES = SPEC.classes.classes.map((c) => ({ ...c }));
 const byId = new Map(CLASSES.map((c) => [c.id, c]));
 const byAlias = new Map();
 for (const c of CLASSES) {
-  for (const key of [c.id, slug(c.en), c.zh]) if (key) byAlias.set(key, c);
+  // Aliases let a preset claim the other names real reference files use --
+  // "operating bed" for an operating table, "patient monitor" for a monitor --
+  // instead of each spelling becoming a class of its own.
+  for (const key of [c.id, slug(c.en), c.zh, ...(c.aliases || []).flatMap((a) => [a, slug(a)])]) {
+    if (key) byAlias.set(key, c);
+  }
 }
 
 /** The class a free-text label from a reference file refers to, if any. */
