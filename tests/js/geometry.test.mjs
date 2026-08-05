@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  floorPlane, corners, toLocal, resizeFromCorner, pathLength, plateMapping,
+  floorPlane, corners, toLocal, resizeFromCorner, pathLength, topDownMapping,
 } from '../../src/meshmark/web/geometry.js';
 
 /** A slab of horizontal triangles at height z, plus optional vertical walls. */
@@ -139,8 +139,8 @@ test('path length is the polyline, and is zero for fewer than two points', () =>
   assert.ok(Math.abs(pathLength([[0, 0], [3, 4], [3, 9]]) - 10) < 1e-12);
 });
 
-test('the plate mapping round-trips, and is not mirrored', () => {
-  const { toPx, toWorld } = plateMapping({ centre: [2, -1], metresPerPixel: 0.0025, pixels: 2048 });
+test('the top-down mapping round-trips, and is not mirrored', () => {
+  const { toPx, toWorld } = topDownMapping({ centre: [2, -1], metresPerPixel: 0.0025, pixels: 2048 });
   const [px, py] = toPx(2.5, -0.4);
   const [x, y] = toWorld(px, py);
   assert.ok(Math.abs(x - 2.5) < 1e-9 && Math.abs(y + 0.4) < 1e-9);

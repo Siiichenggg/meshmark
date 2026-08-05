@@ -1,9 +1,9 @@
-"""meshmark -- annotate objects in a baked 3D scene, in a browser.
+"""meshmark -- hand-annotate objects and routes in a scanned room, in your browser.
 
-Point it at a mesh, get a two-view annotator: an orthographic top-down plate
-where a position can be *measured*, and a 3D view where an object can be
-*identified*. Neither alone is enough -- a trash can and a stack of folded linen
-look much the same from directly above.
+Two linked views: a top-down orthographic render where a position can be
+measured, and a 3D view where an object can be identified. Neither alone is
+enough -- from directly above, a trash can and a stack of folded linen are the
+same grey circle.
 """
 
 __version__ = "0.1.0"

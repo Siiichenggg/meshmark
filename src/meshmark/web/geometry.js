@@ -5,11 +5,10 @@
  * and "we looked at it in the browser and it seemed fine" is not a check.
  */
 
-/* Floor search, ported from the measurement code this tool grew out of.
- * A scan's floor is found, never assumed. The two rooms it was built on sit at
- * 108 mm and 171 mm, both loaded at the origin, so an absolute cut that clears
- * one slices into the other -- and the resulting error reads as "that object is
- * oddly short" rather than as a bug. */
+/* Floor search. A scanned room rarely sits at z = 0 -- the two this was
+ * developed against are at 108 mm and 171 mm -- and every height in the tool is
+ * measured from the floor, so getting this wrong shifts the cut height, the box
+ * bases and the route markers together, by an amount that looks plausible. */
 export const FLOOR = {
   HORIZONTAL_NZ: 0.94,   // |normal.z| above this counts as horizontal
   SEARCH_HEIGHT_M: 1.0,  // how far above the lowest geometry to look
@@ -138,8 +137,8 @@ export function pathLength(waypoints) {
   return total;
 }
 
-/** Mapping between world metres and plate pixels, both directions. */
-export function plateMapping({ centre, metresPerPixel, pixels }) {
+/** Mapping between world metres and top-down pixels, both directions. */
+export function topDownMapping({ centre, metresPerPixel, pixels }) {
   return {
     toPx: (x, y) => [
       (x - centre[0]) / metresPerPixel + pixels / 2,

@@ -4,12 +4,9 @@ The output directory is a static site: an HTML file, a few JavaScript modules, a
 copy of three.js, the mesh, and ``spec.json``. Serve it and it works; it makes
 no network requests and reads nothing outside itself.
 
-``spec.json`` is a separate file rather than a literal pasted into the page.
-That is not tidiness. The version of this tool it grew out of kept its entire
-application inside a Python string, so an undefined identifier in the JavaScript
-was invisible to the interpreter, to linters and to tests -- and one duly
-shipped, silently disabling the code that restored a session's saved work.
-JavaScript that lives in ``.js`` files can be parsed, linted and tested.
+``spec.json`` is a separate file rather than a literal pasted into the page, so
+that the page stays a static file the browser and the tests can both read, and
+the JavaScript stays in ``.js`` files where a parser can see it.
 """
 
 from __future__ import annotations
@@ -55,9 +52,9 @@ def build(
     targets: str | Path | None = None,
     lang: str = "en",
     floor_z_m: float | None = None,
-    plate_pixels: int = 2048,
-    clip_height_m: float = 1.6,
-    reference_points: list[str] | None = None,
+    top_down_pixels: int = 2048,
+    cut_height_m: float = 1.6,
+    markers: list[str] | None = None,
     preload: str | Path | None = None,
     three: str | None = None,
     link: bool = False,
@@ -69,14 +66,14 @@ def build(
 
     if lang not in ("en", "zh"):
         raise BundleError(f"--lang must be en or zh, got {lang!r}")
-    if plate_pixels < 256:
+    if top_down_pixels < 256:
         raise BundleError(
-            f"--plate-pixels {plate_pixels} would give a top-down plate too "
+            f"--top-down-pixels {top_down_pixels} would give a top-down view too "
             f"coarse to measure on; 1024 or more is the useful range"
         )
 
     preset = classes_mod.load(classes)
-    refs = _reference_points(reference_points or [])
+    marks = _markers(markers or [])
     tgts = targets_mod.load(targets) if targets else []
 
     out.mkdir(parents=True, exist_ok=True)
@@ -102,10 +99,10 @@ def build(
         # each other by 63 mm, so a default of zero would be a scene-specific
         # constant wearing the costume of a general one.
         "floor_z_m": floor_z_m,
-        "plate": {"pixels": plate_pixels, "clip_height_m": clip_height_m},
+        "top_down": {"pixels": top_down_pixels, "cut_height_m": cut_height_m},
         "classes": preset,
         "targets": tgts,
-        "reference_points": refs,
+        "markers": marks,
         "baseline": baseline_digest(tgts),
         "preload": preload_data,
         "built_with": {"meshmark_spec": SPEC_VERSION, **installed},
@@ -120,20 +117,20 @@ def build(
     }
 
 
-def _reference_points(specs: list[str]) -> list[dict]:
+def _markers(specs: list[str]) -> list[dict]:
     """Parse ``NAME=X,Y`` into fixed points the annotator draws but never edits."""
     out = []
     for s in specs:
         if "=" not in s:
-            raise BundleError(f"--reference wants NAME=X,Y, got {s!r}")
+            raise BundleError(f"--marker wants NAME=X,Y, got {s!r}")
         name, xy = s.split("=", 1)
         try:
             values = [float(v) for v in xy.split(",")]
         except ValueError as exc:
-            raise BundleError(f"--reference {s!r}: {exc}") from exc
+            raise BundleError(f"--marker {s!r}: {exc}") from exc
         if len(values) != 2:
             raise BundleError(
-                f"--reference {s!r}: expected two numbers, got {len(values)}"
+                f"--marker {s!r}: expected two numbers, got {len(values)}"
             )
         out.append({"name": name, "xy": values})
     return out

@@ -115,7 +115,7 @@ button.warn { background: #5a3030; border-color: #6d3a3a }
 }
 #loading.error { color: #ff8f8f }
 
-#plan {
+#topdown {
   width: 100%; aspect-ratio: 1; border-radius: 6px; border: 1px solid var(--line);
   background: #0d0f12; display: block; cursor: crosshair;
 }

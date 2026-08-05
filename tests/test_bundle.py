@@ -262,7 +262,7 @@ def test_a_bundle_is_self_contained(tmp_path: Path, glb: Path, three: Path):
 
     assert info["scene"] == "room"
     for name in ("index.html", "app.js", "store.js", "i18n.js", "geometry.js",
-                 "plate.js", "style.css", "spec.json", "room.glb"):
+                 "topdown.js", "style.css", "spec.json", "room.glb"):
         assert (out / name).is_file(), f"{name} missing from the bundle"
 
     spec = json.loads((out / "spec.json").read_text(encoding="utf-8"))
@@ -293,14 +293,14 @@ def test_a_scene_with_no_targets_still_builds(tmp_path: Path, glb: Path, three: 
     assert json.loads((out / "spec.json").read_text())["targets"] == []
 
 
-def test_reference_points_are_parsed_and_bad_ones_rejected(tmp_path: Path, glb, three):
+def test_markers_are_parsed_and_bad_ones_rejected(tmp_path: Path, glb, three):
     out = tmp_path / "bundle"
-    bundle.build(mesh=glb, out=out, three=str(three), reference_points=["start=1.5,-2"])
+    bundle.build(mesh=glb, out=out, three=str(three), markers=["start=1.5,-2"])
     spec = json.loads((out / "spec.json").read_text())
-    assert spec["reference_points"] == [{"name": "start", "xy": [1.5, -2.0]}]
+    assert spec["markers"] == [{"name": "start", "xy": [1.5, -2.0]}]
 
     with pytest.raises(bundle.BundleError, match="expected two numbers"):
-        bundle.build(mesh=glb, out=out, three=str(three), reference_points=["start=1,2,3"])
+        bundle.build(mesh=glb, out=out, three=str(three), markers=["start=1,2,3"])
 
 
 def test_link_does_not_copy_the_mesh(tmp_path: Path, glb: Path, three: Path):

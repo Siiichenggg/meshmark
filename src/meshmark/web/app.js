@@ -1,15 +1,15 @@
 /* meshmark -- the annotator itself.
  *
- * Two linked views, because neither alone is enough. The orthographic plate is
+ * Two linked views, because neither alone is enough. The orthographic top-down view is
  * where a position can be measured; the 3D view is where an object can be
  * identified. Both write the same annotation: click the mesh in 3D to place,
- * then nudge on the plate with the arrow keys at centimetre resolution.
+ * then nudge on the top-down view with the arrow keys at centimetre resolution.
  *
  * Coordinates are never converted. The mesh is loaded in whatever frame it was
  * authored in and every number written out is in that frame, so annotations are
  * usable by whatever produced the mesh without a transform anybody has to
- * remember. The plate's mapping is checked against a probe at startup rather
- * than assumed -- see plate.js.
+ * remember. The top-down view's mapping is checked against a probe at startup rather
+ * than assumed -- see topdown.js.
  */
 
 import * as THREE from 'three';
@@ -21,7 +21,7 @@ import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { translator, LANGS } from './i18n.js';
 import * as store from './store.js';
 import * as G from './geometry.js';
-import { bounds, collectTriangles, renderPlate, verifyMapping } from './plate.js';
+import { bounds, collectTriangles, renderTopDown, verifyMapping } from './topdown.js';
 
 const $ = (id) => document.getElementById(id);
 const SPEC = await (await fetch('./spec.json')).json();
@@ -123,8 +123,8 @@ let addMode = false;
 let pathMode = false;
 let filter = 'all';
 let floorZ = SPEC.floor_z_m;
-let plate = null;
-let plateClipHeight = SPEC.plate.clip_height_m;
+let topDown = null;
+let topDownCutHeight = SPEC.top_down.cut_height_m;
 
 const OBJ = () => targets.concat(extra);
 const current = () => OBJ()[cur];
@@ -150,7 +150,7 @@ view.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d0f12);
-// Up axis is taken from the mesh, not imposed: the plate and the annotations
+// Up axis is taken from the mesh, not imposed: the top-down view and the annotations
 // are in the mesh's own frame, and rotating it here would put every exported
 // coordinate in a frame nothing downstream knows about.
 const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 500);
@@ -236,13 +236,13 @@ if (floorZ === null || floorZ === undefined) {
   floorZ = floor.z;
   window.__floor = floor;
 }
-clipPlane.constant = floorZ + plateClipHeight;
-$('clip').value = plateClipHeight;
-$('cliph').textContent = plateClipHeight.toFixed(2);
+clipPlane.constant = floorZ + topDownCutHeight;
+$('cut').value = topDownCutHeight;
+$('cutval').textContent = topDownCutHeight.toFixed(2);
 
-$('loading').textContent = t('view.plate');
+$('loading').textContent = t('view.topdown');
 // Give the browser a chance to paint that message before the readback below,
-// which is synchronous and takes a moment on a large plate.
+// which is synchronous and takes a moment on a large topDown.
 //
 // Raced against a timer rather than awaiting the frame alone: requestAnimationFrame
 // does not fire in a hidden tab, so awaiting it means a bundle opened in a
@@ -253,17 +253,17 @@ await new Promise((resolve) => {
   requestAnimationFrame(resolve);
   setTimeout(resolve, 50);
 });
-buildPlate();
+buildTopDown();
 scene.add(overlay);
 $('loading').remove();
 
-function buildPlate() {
+function buildTopDown() {
   overlay.visible = false;
-  plate = renderPlate(renderer, scene, { box: bounds(room), pixels: SPEC.plate.pixels });
+  topDown = renderTopDown(renderer, scene, { box: bounds(room), pixels: SPEC.top_down.pixels });
   overlay.visible = true;
-  plateClipHeight = clipPlane.constant - floorZ;
-  Object.assign(plate, G.plateMapping({
-    centre: plate.centre, metresPerPixel: plate.metresPerPixel, pixels: plate.pixels,
+  topDownCutHeight = clipPlane.constant - floorZ;
+  Object.assign(topDown, G.topDownMapping({
+    centre: topDown.centre, metresPerPixel: topDown.metresPerPixel, pixels: topDown.pixels,
   }));
 }
 
@@ -274,7 +274,7 @@ const routeColour = (i) => ROUTE_COLOURS[i % ROUTE_COLOURS.length];
 
 function rebuildOverlay() {
   overlay.clear();
-  for (const r of SPEC.reference_points || []) {
+  for (const r of SPEC.markers || []) {
     const m = new THREE.Mesh(
       new THREE.ConeGeometry(0.16, 0.5, 4),
       new THREE.MeshBasicMaterial({ color: 0xff7ad0, transparent: true, opacity: 0.8 })
@@ -354,8 +354,8 @@ function frame() {
   const o = current();
   if (!o) return;
   const a = A();
-  const [x, y] = (a && a.xy) ? a.xy : (o.reference_xy || plate.centre);
-  let dx = x - plate.centre[0], dy = y - plate.centre[1];
+  const [x, y] = (a && a.xy) ? a.xy : (o.reference_xy || topDown.centre);
+  let dx = x - topDown.centre[0], dy = y - topDown.centre[1];
   let n = Math.hypot(dx, dy);
   // A target in the middle of the room has no meaningful "towards the centre"
   // direction; back off along -Y rather than divide by ~zero.
@@ -364,7 +364,7 @@ function frame() {
 
   const look = new THREE.Vector3(x, y, floorZ + 0.45);
   const dir = new THREE.Vector3(dx, dy, 1.0).normalize();
-  let dist = Math.min(3.0, plate.span / 2);
+  let dist = Math.min(3.0, topDown.span / 2);
   // Backing off blindly parks the camera inside whatever stands between the
   // target and the middle of the room. The ray starts outside the target's own
   // footprint, or the first thing it hits is the object we want to look at.
@@ -424,31 +424,31 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   if (hits.length) place(hits[0].point.x, hits[0].point.y);
 });
 
-/* ------------------------------------------------------------------- plate */
+/* ------------------------------------------------------------------- topDown */
 
-const pc = $('plan');
+const pc = $('topdown');
 const pctx = pc.getContext('2d');
 let pv = { s: 1, ox: 0, oy: 0 };
 
 const toScreen = (x, y) => {
-  const [px, py] = plate.toPx(x, y);
+  const [px, py] = topDown.toPx(x, y);
   return [px * pv.s + pv.ox, py * pv.s + pv.oy];
 };
-const screenToWorld = (sx, sy) => plate.toWorld((sx - pv.ox) / pv.s, (sy - pv.oy) / pv.s);
+const screenToWorld = (sx, sy) => topDown.toWorld((sx - pv.ox) / pv.s, (sy - pv.oy) / pv.s);
 
 function resizePlan() {
-  if (!plate || !pc.clientWidth) return;
+  if (!topDown || !pc.clientWidth) return;
   pc.width = pc.height = Math.max(180, pc.clientWidth);
   planFocus();
 }
 function planFocus() {
   const o = current();
   const a = A();
-  const [x, y] = (a && a.xy) ? a.xy : (o?.reference_xy || plate.centre);
+  const [x, y] = (a && a.xy) ? a.xy : (o?.reference_xy || topDown.centre);
   // Open at roughly two metres across, which is close enough to judge a box
   // against the object under it without hunting for the target first.
-  pv.s = pc.width / (2.0 / plate.metresPerPixel);
-  const [px, py] = plate.toPx(x, y);
+  pv.s = pc.width / (2.0 / topDown.metresPerPixel);
+  const [px, py] = topDown.toPx(x, y);
   pv.ox = pc.width / 2 - px * pv.s;
   pv.oy = pc.height / 2 - py * pv.s;
   drawPlan();
@@ -459,7 +459,7 @@ function drawPlan() {
   pctx.fillStyle = '#0d0f12';
   pctx.fillRect(0, 0, pc.width, pc.height);
   pctx.imageSmoothingEnabled = pv.s < 1;
-  pctx.drawImage(plate.canvas, pv.ox, pv.oy, plate.pixels * pv.s, plate.pixels * pv.s);
+  pctx.drawImage(topDown.canvas, pv.ox, pv.oy, topDown.pixels * pv.s, topDown.pixels * pv.s);
 
   const showRefs = $('showrefs').checked;
   OBJ().forEach((o, i) => {
@@ -469,7 +469,7 @@ function drawPlan() {
     if (o.reference_xy && showRefs) {
       [gx, gy] = toScreen(...o.reference_xy);
       pctx.beginPath();
-      pctx.arc(gx, gy, (o.radius_m / plate.metresPerPixel) * pv.s, 0, 7);
+      pctx.arc(gx, gy, (o.radius_m / topDown.metresPerPixel) * pv.s, 0, 7);
       pctx.strokeStyle = isCur ? '#ff5555' : 'rgba(255,85,85,.28)';
       pctx.lineWidth = isCur ? 2 : 1;
       pctx.setLineDash(isCur ? [7, 5] : [3, 4]);
@@ -509,7 +509,7 @@ function drawPlan() {
     }
   });
 
-  for (const r of SPEC.reference_points || []) {
+  for (const r of SPEC.markers || []) {
     const [sx, sy] = toScreen(...r.xy);
     pctx.beginPath();
     pctx.arc(sx, sy, 6, 0, 7);
@@ -542,11 +542,11 @@ function drawPlan() {
     pctx.globalAlpha = 1;
   });
 
-  const staleBy = Math.abs(clipPlane.constant - floorZ - plateClipHeight);
+  const staleBy = Math.abs(clipPlane.constant - floorZ - topDownCutHeight);
   $('scale').innerHTML =
-    t('plan.scale', { mm: ((plate.metresPerPixel / pv.s) * 1000).toFixed(2) })
+    t('topdown.scale', { mm: ((topDown.metresPerPixel / pv.s) * 1000).toFixed(2) })
     + (staleBy > 1e-6
-      ? ` <span class="stale">· ${t('plan.stale', { h: plateClipHeight.toFixed(2) })}</span>`
+      ? ` <span class="stale">· ${t('topdown.stale', { h: topDownCutHeight.toFixed(2) })}</span>`
       : '');
 }
 
@@ -804,7 +804,7 @@ function redraw() {
   $('addbtn').className = addMode ? 'primary' : '';
   $('pathbtn').textContent = t(pathMode ? 'routes.mode.on' : 'routes.mode.off');
   $('pathbtn').className = pathMode ? 'primary' : '';
-  $('refinfo').innerHTML = (SPEC.reference_points || []).length ? t('refs.legend') : '';
+  $('refinfo').innerHTML = (SPEC.markers || []).length ? t('markers.legend') : '';
   $('baseline').textContent = SPEC.targets.length
     ? t('view.baseline', { baseline: SPEC.baseline })
     : t('view.noTargets');
@@ -928,10 +928,10 @@ function buildExport() {
       mesh_source: SPEC.mesh.source,
       floor_z_m: +floorZ.toFixed(4),
       floor_source: SPEC.floor_z_m === null ? 'measured from the mesh' : 'given with --floor',
-      plate: {
-        pixels: plate.pixels,
-        metres_per_pixel: plate.metresPerPixel,
-        centre_xy: plate.centre,
+      top_down: {
+        pixels: topDown.pixels,
+        metres_per_pixel: topDown.metresPerPixel,
+        centre_xy: topDown.centre,
       },
       classes_preset: SPEC.classes.name,
       baseline: SPEC.baseline,
@@ -954,11 +954,18 @@ function buildExport() {
       if (o.radius_m != null) out.footprint_radius_m = o.radius_m;
       if (a.xy) {
         out.world_xy = a.xy.map((v) => +v.toFixed(4));
-        out.footprint = {
+        const nominal = clsSize(clsId)[2];
+        out.box = {
           width_m: +a.w.toFixed(3),
           depth_m: +a.d.toFixed(3),
-          height_m: +(a.h || 0.9).toFixed(3),
+          height_m: +(a.h || nominal).toFixed(3),
           yaw_deg: a.yaw || 0,
+          // Width, depth and yaw are dragged onto the object. Height is not:
+          // nothing in either view measures it, so it starts as the class
+          // default and stays there unless someone types a number. Saying which
+          // it is here is the difference between a measurement and a guess that
+          // gets cited as one.
+          height_source: Math.abs((a.h || nominal) - nominal) < 1e-6 ? 'class default' : 'entered by hand',
         };
         if (o.reference_xy) {
           out.offset_m = +Math.hypot(
@@ -1002,8 +1009,8 @@ function applyRound(d) {
       // as an object rather than dropping it on the floor.
       extra.push({
         object_id: o.object_id, cls: clsId, kind: 'added', reference_xy: null,
-        radius_m: o.footprint
-          ? +(Math.max(o.footprint.width_m, o.footprint.depth_m) / 2).toFixed(3)
+        radius_m: (o.box || o.footprint)
+          ? +(Math.max((o.box || o.footprint).width_m, (o.box || o.footprint).depth_m) / 2).toFixed(3)
           : (o.footprint_radius_m || 0.3),
         extra: o.source_fields || {},
       });
@@ -1015,10 +1022,11 @@ function applyRound(d) {
     if (clsId !== base) a.cls = clsId;
     if (o.world_xy) {
       a.xy = o.world_xy;
-      a.w = o.footprint?.width_m ?? 0.5;
-      a.d = o.footprint?.depth_m ?? 0.5;
-      a.h = o.footprint?.height_m ?? 0.9;
-      a.yaw = o.footprint?.yaw_deg ?? 0;
+      const b = o.box || o.footprint || {};
+      a.w = b.width_m ?? 0.5;
+      a.d = b.depth_m ?? 0.5;
+      a.h = b.height_m ?? 0.9;
+      a.yaw = b.yaw_deg ?? 0;
     }
     ann[o.object_id] = a;
   }
@@ -1098,14 +1106,14 @@ for (const b of document.querySelectorAll('.tabs button')) {
   b.onclick = () => setFilter(b.dataset.f);
 }
 
-$('clip').addEventListener('input', () => {
-  clipPlane.constant = floorZ + +$('clip').value;
-  $('cliph').textContent = (+$('clip').value).toFixed(2);
+$('cut').addEventListener('input', () => {
+  clipPlane.constant = floorZ + +$('cut').value;
+  $('cutval').textContent = (+$('cut').value).toFixed(2);
   drawPlan();
 });
-// Re-render the plate on release, not on every input event: a 2048px readback
+// Re-render the top-down view on release, not on every input event: a 2048px readback
 // is tens of milliseconds and dragging the slider would stutter.
-$('clip').addEventListener('change', () => { buildPlate(); redraw(); });
+$('cut').addEventListener('change', () => { buildTopDown(); redraw(); });
 
 addEventListener('keydown', (e) => {
   if (['TEXTAREA', 'INPUT', 'SELECT'].includes(e.target.tagName)) return;
@@ -1159,20 +1167,20 @@ redraw();
 // A flipped axis produces annotations that look entirely reasonable and are
 // mirrored, and that is not a bug anyone catches by looking at a screenshot.
 const probe = [
-  plate.centre[0] - plate.span * 0.31,
-  plate.centre[1] + plate.span * 0.19,
+  topDown.centre[0] - topDown.span * 0.31,
+  topDown.centre[1] + topDown.span * 0.19,
 ];
-const mapping = verifyMapping(renderer, plate, probe, floorZ + 0.5);
+const mapping = verifyMapping(renderer, topDown, probe, floorZ + 0.5);
 if (!mapping.ok) {
-  console.error('meshmark: the plate mapping does not match a probe', mapping);
+  console.error('meshmark: the top-down mapping does not match a probe', mapping);
 } else {
-  console.info(`meshmark: plate mapping verified to ${mapping.errorPx.toFixed(2)} px `
+  console.info(`meshmark: top-down mapping verified to ${mapping.errorPx.toFixed(2)} px `
     + `(${(mapping.errorM * 1000).toFixed(1)} mm)`);
 }
 
 window.__meshmark = {
   THREE, scene, camera, controls, clipPlane, SPEC, renderer,
-  get plate() { return plate; },
+  get topDown() { return topDown; },
   get floorZ() { return floorZ; },
   get ann() { return ann; },
   get extra() { return extra; },

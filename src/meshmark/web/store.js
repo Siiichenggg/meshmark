@@ -1,14 +1,9 @@
 /* Saved work: what is written where, and what survives a rebuild.
  *
- * This module exists because of a specific failure. In the version this tool
- * grew out of, loading saved work was two lines in the middle of the
- * application, and a commit about something else deleted them. The page went on
- * claiming "saved automatically, a refresh does not lose it" while every object
- * annotation was discarded on load, for days, unnoticed.
- *
- * The lines are now a function with a test that seeds a store and asserts the
- * work comes back. Nothing in here touches the DOM or three.js, so that test
- * runs in node.
+ * Loading and saving are a module with tests rather than a few lines inside the
+ * application, because losing a session's work is both the worst thing this tool
+ * can do and the hardest failure to notice: the page keeps saying it saved.
+ * Nothing here touches the DOM or three.js, so the tests run in node.
  *
  * Two scopes, on purpose:
  *

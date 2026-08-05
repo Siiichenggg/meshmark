@@ -1,17 +1,14 @@
-/* The orthographic top-down plate, rendered from the mesh in the browser.
+/* The orthographic top-down view, rendered from the mesh in the browser.
  *
- * The plate is the view where a position can be *measured*: an exact
+ * The view is the view where a position can be *measured*: an exact
  * world-to-pixel mapping, no perspective to argue with, a millimetres-per-pixel
  * figure printed under it. The 3D view is where an object can be *identified*,
- * which the plate frequently cannot do -- a trash can and a stack of folded
+ * which the view frequently cannot do -- a trash can and a stack of folded
  * linen look much the same from directly above.
  *
- * The earlier version of this tool got its plate from a Blender script run
- * ahead of time, which made "annotate a mesh" mean "install Blender, run our
- * render script, keep a meta.json in step with it". Rendering it here from the
- * mesh already loaded costs one frame and removes all of that -- and gains
- * something the offline plate could not do: the plate re-renders when the
- * ceiling cut moves, so sliding the cut down reveals the floor beneath it.
+ * Rendering it here, from the mesh the page has already loaded, costs one frame
+ * and means the view can be re-rendered whenever the cut height moves -- so
+ * lowering the cut reveals what was underneath it.
  *
  * Orientation is the hazard. A flipped axis here produces annotations that look
  * entirely reasonable and are mirrored, which no screenshot review catches. So
@@ -81,7 +78,7 @@ export function collectTriangles(meshes) {
  * @returns {{canvas: HTMLCanvasElement, centre: number[], metresPerPixel: number,
  *            pixels: number, span: number}}
  */
-export function renderPlate(renderer, scene, { box, pixels, margin = 0.04 }) {
+export function renderTopDown(renderer, scene, { box, pixels, margin = 0.04 }) {
   const size = new THREE.Vector3();
   box.getSize(size);
   const centreV = new THREE.Vector3();
@@ -92,7 +89,7 @@ export function renderPlate(renderer, scene, { box, pixels, margin = 0.04 }) {
   const px = Math.min(pixels, renderer.capabilities.maxTextureSize);
 
   const cam = new THREE.OrthographicCamera(-span / 2, span / 2, span / 2, -span / 2, 0.01, 1e6);
-  // Explicitly Y-up for this camera even though the app orbits Z-up: the plate's
+  // Explicitly Y-up for this camera even though the app orbits Z-up: the view's
   // mapping assumes screen-right is +X and screen-up is +Y, and that is what a
   // camera looking down -Z with up = +Y gives.
   cam.up.set(0, 1, 0);
@@ -133,15 +130,15 @@ export function renderPlate(renderer, scene, { box, pixels, margin = 0.04 }) {
 }
 
 /**
- * Check the plate's world-to-pixel mapping against a probe, not against belief.
+ * Check the view's world-to-pixel mapping against a probe, not against belief.
  *
  * Renders a small bright marker at a deliberately asymmetric world position and
  * reports where its pixels actually landed versus where the mapping predicts. A
  * mirrored axis passes every visual review and fails this.
  */
-export function verifyMapping(renderer, plate, probeXY, z) {
+export function verifyMapping(renderer, view, probeXY, z) {
   const probe = new THREE.Mesh(
-    new THREE.BoxGeometry(plate.span / 40, plate.span / 40, 0.01),
+    new THREE.BoxGeometry(view.span / 40, view.span / 40, 0.01),
     new THREE.MeshBasicMaterial({ color: 0xff00ff })
   );
   probe.position.set(probeXY[0], probeXY[1], z);
@@ -150,12 +147,12 @@ export function verifyMapping(renderer, plate, probeXY, z) {
   probeScene.add(probe);
 
   const box = new THREE.Box3(
-    new THREE.Vector3(plate.centre[0] - plate.span / 2, plate.centre[1] - plate.span / 2, z - 1),
-    new THREE.Vector3(plate.centre[0] + plate.span / 2, plate.centre[1] + plate.span / 2, z + 1)
+    new THREE.Vector3(view.centre[0] - view.span / 2, view.centre[1] - view.span / 2, z - 1),
+    new THREE.Vector3(view.centre[0] + view.span / 2, view.centre[1] + view.span / 2, z + 1)
   );
-  // Same margin arithmetic as the real plate, or the probe is measured against a
+  // Same margin arithmetic as the real view, or the probe is measured against a
   // different span than the one being checked.
-  const shot = renderPlate(renderer, probeScene, { box, pixels: plate.pixels, margin: 0 });
+  const shot = renderTopDown(renderer, probeScene, { box, pixels: view.pixels, margin: 0 });
   probe.geometry.dispose();
   probe.material.dispose();
 
@@ -173,7 +170,7 @@ export function verifyMapping(renderer, plate, probeXY, z) {
     (probeXY[0] - shot.centre[0]) / shot.metresPerPixel + shot.pixels / 2,
     shot.pixels / 2 - (probeXY[1] - shot.centre[1]) / shot.metresPerPixel,
   ];
-  if (!n) return { ok: false, reason: 'probe not visible in the plate', expected };
+  if (!n) return { ok: false, reason: 'probe not visible in the top-down view', expected };
   const found = [sx / n, sy / n];
   const errorPx = Math.hypot(found[0] - expected[0], found[1] - expected[1]);
   return {

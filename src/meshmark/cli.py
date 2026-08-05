@@ -1,11 +1,10 @@
-"""Command line: build a bundle, and serve one.
+"""Command line: build an annotator bundle from a mesh, and serve it.
 
     meshmark build room.glb --out .annotate/room --classes operating-room
     meshmark serve .annotate/room
 
-``serve`` binds to 127.0.0.1 and nothing else. The bundle contains a copy of
-whatever mesh it was pointed at, which for a scan of a real room is not
-something to put on a listening socket by accident.
+``serve`` binds to 127.0.0.1 only. A bundle contains a copy of the scan it was
+built from, and scans of real interiors should not reach a network by accident.
 """
 
 from __future__ import annotations
@@ -28,33 +27,38 @@ ERRORS = (BundleError, PresetError, MeshError, TargetError, VendorError)
 def _build_parser(sub) -> None:
     p = sub.add_parser("build", help="assemble an annotator bundle from a mesh")
     p.add_argument("mesh", help=".glb, .gltf or .obj")
-    p.add_argument("--out", required=True, help="directory to write the bundle into")
-    p.add_argument("--scene", help="name for this scene (default: the mesh filename)")
-    p.add_argument("--classes", default="generic",
+    p.add_argument("--out", required=True, metavar="DIR", help="directory to write the bundle into")
+    p.add_argument("--name", dest="scene", metavar="NAME",
+                   help="name for this room (default: the mesh filename). Your "
+                        "saved work in the browser is stored under it")
+    p.add_argument("--classes", default="generic", metavar="PRESET|FILE",
                    help="class preset: a built-in name or a path to JSON "
                         "(default: generic)")
-    p.add_argument("--targets",
-                   help="existing positions to annotate against, as JSON. Each "
-                        "is drawn as a ring to confirm, correct or mark absent")
+    p.add_argument("--targets", metavar="FILE",
+                   help="positions to check, as JSON. Each is drawn as a ring you "
+                        "confirm, correct, or mark absent. See also --marker")
     p.add_argument("--lang", default="en", choices=("en", "zh"),
                    help="language for a browser that has not chosen one yet. "
                         "The in-page switch overrides it and is remembered, so "
                         "this is a default and not a setting")
-    p.add_argument("--floor", type=float, dest="floor_z_m",
+    p.add_argument("--floor", type=float, dest="floor_z_m", metavar="METRES",
                    help="floor height in metres. Omit and it is measured from "
                         "the mesh, which is the right default: a scan's floor "
                         "is rarely at zero")
-    p.add_argument("--plate-pixels", type=int, default=2048,
-                   help="resolution of the top-down plate (default: 2048)")
-    p.add_argument("--clip-height", type=float, default=1.6, dest="clip_height_m",
-                   help="metres above the floor to cut the ceiling away at, in "
-                        "both views (default: 1.6)")
-    p.add_argument("--reference", action="append", default=[], metavar="NAME=X,Y",
+    p.add_argument("--top-down-pixels", type=int, default=2048, dest="top_down_pixels",
+                   metavar="N",
+                   help="resolution of the top-down view (default: 2048)")
+    p.add_argument("--cut-height", type=float, default=1.6, dest="cut_height_m",
+                   metavar="METRES",
+                   help="metres above the floor to hide everything above, in both "
+                        "views (default: 1.6)")
+    p.add_argument("--marker", action="append", default=[], metavar="NAME=X,Y",
                    help="a fixed point to draw but never edit, such as a robot "
-                        "start pose; repeatable")
-    p.add_argument("--preload", help="an exported annotation file to open with, "
+                        "start pose. Not the same as --targets, which are "
+                        "positions you check. Repeatable")
+    p.add_argument("--preload", metavar="FILE", help="an exported annotation file to open with, "
                                      "when the browser has no saved work")
-    p.add_argument("--three", help="path to a three.js package directory")
+    p.add_argument("--three", metavar="DIR", help="path to a three.js package directory")
     p.add_argument("--link", action="store_true",
                    help="symlink the mesh instead of copying it")
 
@@ -85,14 +89,14 @@ def _run_build(args) -> int:
     info = build(
         mesh=args.mesh, out=args.out, scene=args.scene, classes=args.classes,
         targets=args.targets, lang=args.lang, floor_z_m=args.floor_z_m,
-        plate_pixels=args.plate_pixels, clip_height_m=args.clip_height_m,
-        reference_points=args.reference, preload=args.preload,
+        top_down_pixels=args.top_down_pixels, cut_height_m=args.cut_height_m,
+        markers=args.marker, preload=args.preload,
         three=args.three, link=args.link,
     )
     print(
         f"{info['out']}/index.html\n"
-        f"  scene {info['scene']} · {info['classes']} classes · "
-        f"{info['targets']} reference targets"
+        f"  room {info['scene']} · {info['classes']} classes · "
+        f"{info['targets']} reference positions"
         + (f" · baseline {info['baseline']}" if info["targets"] else "")
         + f"\n  mesh {info['mesh_mb']:.1f} MB · three {info['three']}\n"
         f"  meshmark serve {info['out']}"

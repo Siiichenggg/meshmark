@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "meshmark"
 version = "0.1.0"
-description = "Annotate objects and routes in a baked 3D scene, in the browser."
+description = "Hand-annotate objects and routes in a scanned room, in your browser."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

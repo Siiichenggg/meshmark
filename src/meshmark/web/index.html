@@ -83,8 +83,8 @@ window.__meshmarkErrors = [];
 <div id="view">
   <div class="bar">
     <span data-i18n="view.mode3d"></span>
-    <label><span data-i18n="view.clip"></span> <span id="cliph">1.60</span> m</label>
-    <input type="range" id="clip" min="0.2" max="4.0" step="0.05" value="1.6">
+    <label><span data-i18n="view.cut"></span> <span id="cutval">1.60</span> m</label>
+    <input type="range" id="cut" min="0.2" max="4.0" step="0.05" value="1.6">
     <button id="framebtn" data-i18n="view.frame"></button>
     <span id="baseline" class="soft"></span>
   </div>
@@ -100,8 +100,8 @@ window.__meshmarkErrors = [];
   </div>
   <small id="lblnote"></small>
 
-  <h2 data-i18n="plan.title"></h2>
-  <canvas id="plan"></canvas>
+  <h2 data-i18n="topdown.title"></h2>
+  <canvas id="topdown"></canvas>
   <small id="scale"></small>
 
   <div class="kv" id="readout"></div>
