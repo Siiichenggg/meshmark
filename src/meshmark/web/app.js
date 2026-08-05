@@ -356,6 +356,9 @@ function frame() {
 
 function resize3d() {
   const w = view.clientWidth, h = view.clientHeight;
+  // A container with no size yet gives aspect = 0/0 = NaN, which poisons the
+  // projection matrix and leaves a blank view even after a later resize.
+  if (!w || !h) return;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
@@ -402,6 +405,7 @@ const toScreen = (x, y) => {
 const screenToWorld = (sx, sy) => plate.toWorld((sx - pv.ox) / pv.s, (sy - pv.oy) / pv.s);
 
 function resizePlan() {
+  if (!plate || !pc.clientWidth) return;
   pc.width = pc.height = Math.max(180, pc.clientWidth);
   planFocus();
 }
@@ -1089,7 +1093,24 @@ addEventListener('keydown', (e) => {
   }
 });
 
-addEventListener('resize', () => { resize3d(); resizePlan(); });
+/* Sized from the elements themselves, not from window resize events.
+ *
+ * A window event never arrives if the page boots while its container has no
+ * width -- a hidden tab, a panel that lays out late, an iframe sized after
+ * load -- and both canvases then sit at their 300x150 default until the user
+ * happens to resize the window. Measured in a browser reporting innerWidth 0:
+ * the view canvas stayed at 0 through a full reload and only came right when a
+ * resize event was dispatched by hand. A ResizeObserver fires when the element
+ * actually gets a size, which is the condition that matters.
+ */
+const sizeWatcher = new ResizeObserver(() => { resize3d(); resizePlan(); });
+// The two canvases' own containers, not the panel around them. The right panel
+// scrolls, so a change in its content can add or remove a scrollbar, change its
+// content width, and re-enter this callback -- the classic ResizeObserver loop.
+// Setting a canvas's width attribute does not change its CSS box, so watching
+// the canvas itself cannot feed back.
+sizeWatcher.observe(view);
+sizeWatcher.observe(pc);
 
 /* -------------------------------------------------------------------- boot */
 
@@ -1128,6 +1149,11 @@ window.__meshmark = {
   get lang() { return lang; },
   mapping,
   place, step, setStatus, setClass, setLanguage, buildExport, applyRound, redraw,
+  // What the ResizeObserver calls. Exposed because the observer is delivered on
+  // the event loop's rendering steps, which a hidden page does not run -- so in
+  // a headless or background tab the sizing path cannot be triggered from
+  // outside any other way, and an untriggerable path is an unverifiable one.
+  resize() { resize3d(); resizePlan(); },
   // Pose the view from outside the page. Setting camera.position alone does
   // nothing lasting -- OrbitControls re-derives it from its target every frame.
   look(cx, cy, cz, tx, ty, tz) {
