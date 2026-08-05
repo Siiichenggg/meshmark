@@ -79,9 +79,22 @@ def test_readme_images_exist():
     for name in ("README.md", "README.zh.md"):
         text = (ROOT / name).read_text(encoding="utf-8")
         refs = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", text)
-        assert refs, f"{name} shows no screenshot at all"
-        for ref in refs:
+        # Badges are images too, and they live on other people's servers.
+        local = [r for r in refs if not r.startswith(("http://", "https://"))]
+        assert local, f"{name} shows no screenshot at all"
+        for ref in local:
             assert (ROOT / ref).is_file(), f"{name} references missing image {ref}"
+
+
+def test_readme_links_resolve():
+    """A README that links to files which are not there wastes the reader's click."""
+    import re
+    for name in ("README.md", "README.zh.md"):
+        text = (ROOT / name).read_text(encoding="utf-8")
+        links = re.findall(r"(?<!!)\[[^\]]*\]\(([^)]+)\)", text)
+        local = [l for l in links if not l.startswith(("http://", "https://", "#"))]
+        broken = [l for l in local if not (ROOT / l).exists()]
+        assert not broken, f"{name} links to missing files: {broken}"
 
 
 def test_readme_quickstart_matches_shipped_examples():
@@ -90,3 +103,46 @@ def test_readme_quickstart_matches_shipped_examples():
     for path in ("examples/demo_room.glb", "examples/demo_room_targets.json"):
         assert path in text, f"the quickstart no longer mentions {path}"
         assert (ROOT / path).is_file(), f"{path} is in the quickstart but not in the repo"
+
+
+def _flags(text: str) -> set[str]:
+    """Every command-line flag a document mentions, wherever it mentions it.
+
+    Anywhere, not only inside backticks: the serve flags are documented inside
+    one code span as ``[--port 8731] [--open]``, and a stricter pattern reported
+    them as undocumented when they are on the page in front of you.
+    """
+    import re
+    return set(re.findall(r"(--[a-z][a-z-]*)", text))
+
+
+def test_the_two_readmes_stay_in_sync():
+    """A bilingual project drifts the moment one language is updated alone.
+
+    Not a translation check -- prose is prose. It compares the things that are
+    the same in both by definition: section count, collapsible blocks, images,
+    and every command-line flag either of them documents.
+    """
+    import re
+    en = (ROOT / "README.md").read_text(encoding="utf-8")
+    zh = (ROOT / "README.zh.md").read_text(encoding="utf-8")
+
+    for what, pattern in [("sections", r"(?m)^## "), ("collapsibles", r"<details>")]:
+        assert len(re.findall(pattern, en)) == len(re.findall(pattern, zh)), (
+            f"the two READMEs have different numbers of {what}"
+        )
+
+    images = lambda t: sorted(re.findall(r"!\[[^\]]*\]\(([^)]+)\)", t))
+    assert images(en) == images(zh), "the two READMEs show different images"
+
+    only_en, only_zh = _flags(en) - _flags(zh), _flags(zh) - _flags(en)
+    assert not only_en, f"documented in English only: {sorted(only_en)}"
+    assert not only_zh, f"documented in Chinese only: {sorted(only_zh)}"
+
+
+def test_every_command_line_flag_is_documented():
+    """A flag the CLI accepts and the README never mentions is a hidden feature."""
+    import re
+    accepted = set(re.findall(r'"(--[a-z-]+)"', (ROOT / "src/meshmark/cli.py").read_text()))
+    missing = accepted - _flags((ROOT / "README.md").read_text()) - {"--version"}
+    assert not missing, f"accepted by the CLI, absent from the README: {sorted(missing)}"
