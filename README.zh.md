@@ -4,15 +4,26 @@
 
 [English](README.md)
 
+![meshmark 标定器：左边是扫描手术室的 3D 视图，右边是可量测的正交俯视底图](docs/annotator.jpg)
+
+<sub>一个真实手术室的摄影测量扫描，标注中。黄色：拟合出来的包围盒。红色：真值文件声称的位置。青色：一个人在地面上的行走路线。右侧面板是同一个物体的正上方视图，6.2 毫米/像素。</sub>
+
 指向一个网格文件，得到一个双视图标定器：写出带朝向的包围盒、中英双语类别标签、
 以及带名字的地面路线，导出为 JSON。
 
 ```bash
 npm install three                        # 装一次，装在哪都行
 pip install -e .
-meshmark build room.glb --out .annotate/room --classes generic
-meshmark serve .annotate/room --open
+meshmark build examples/demo_room.glb --out .annotate/demo \
+    --classes operating-room --targets examples/demo_room_targets.json
+meshmark serve .annotate/demo --open
 ```
+
+仓库里自带一个演示房间，所以在你有自己的网格之前就能先跑起来。它的地面在
+0.12 m 而不是 0，有两个物体是贴在一起的，还有一个参考位置指向一个房间里
+根本不存在的物体 —— 把它找出来正是这个工具的活。
+
+![同一个标定器，跑在仓库自带的合成演示房间上](docs/demo-room.png)
 
 不需要 Blender，不需要预处理，不联网 —— 构建出来的包是一个静态目录，
 运行时不发出任何对外请求。

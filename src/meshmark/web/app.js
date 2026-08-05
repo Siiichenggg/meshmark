@@ -157,7 +157,8 @@ const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 500);
 camera.up.set(0, 0, 1);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+const ambient = new THREE.AmbientLight(0xffffff, 1.0);
+scene.add(ambient);
 
 const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
 const overlay = new THREE.Group();
@@ -203,6 +204,30 @@ if (!roomMeshes.length) {
   $('loading').className = 'error';
   $('loading').textContent = t('view.failed', { err: `${SPEC.mesh.file}: no meshes in it` });
   throw new Error('no meshes');
+}
+
+/* How the scene is lit depends on whether it already is.
+ *
+ * A photogrammetry scan carries its lighting baked into the texture, and adding
+ * a lamp to it double-lights the room: shading laid over shading that is already
+ * there. Flat ambient is right for that, and was the only mode this had.
+ *
+ * An untextured mesh has no lighting at all, and under flat ambient every face
+ * of every object returns exactly its base colour -- a silhouette with no edges,
+ * in the one view whose entire job is letting a person identify what they are
+ * looking at. So a mesh that brings no shading of its own gets some. */
+const litAlready = roomMeshes.some((m) =>
+  (Array.isArray(m.material) ? m.material : [m.material])
+    .some((x) => x && (x.map || x.vertexColors || x.emissiveMap || x.aoMap)));
+if (!litAlready) {
+  ambient.intensity = 0.55;
+  const sky = new THREE.HemisphereLight(0xdfe8ff, 0x2b3038, 1.1);
+  scene.add(sky);
+  const key = new THREE.DirectionalLight(0xffffff, 1.25);
+  // Off-axis and from above: straight-on light flattens exactly the vertical
+  // faces whose edges tell you where an object ends.
+  key.position.set(2.5, -3.5, 6.0);
+  scene.add(key);
 }
 scene.add(room);
 
@@ -359,7 +384,14 @@ function resize3d() {
   // A container with no size yet gives aspect = 0/0 = NaN, which poisons the
   // projection matrix and leaves a blank view even after a later resize.
   if (!w || !h) return;
-  renderer.setSize(w, h, false);
+  // updateStyle left on, deliberately. With it off, setSize writes only the
+  // drawing-buffer size -- which setPixelRatio has already multiplied by the
+  // display's device pixel ratio -- and the canvas element then lays out at
+  // that size in CSS pixels. On a 2x display that is a canvas twice as wide and
+  // twice as tall as the box holding it, and since #view hides its overflow,
+  // the visible 3D view is the top-left QUARTER of the render. It looks like a
+  // badly framed camera, not like a bug, which is how it survives review.
+  renderer.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }

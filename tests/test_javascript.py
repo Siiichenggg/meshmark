@@ -71,3 +71,22 @@ def test_no_language_is_hardcoded_in_the_markup():
     allowed = {"meshmark", "m", "1.60"}
     leftovers = [w for w in text.split() if w not in allowed]
     assert leftovers == [], f"untranslatable text in index.html: {leftovers}"
+
+
+def test_readme_images_exist():
+    """A README whose images 404 is the first thing a visitor sees."""
+    import re
+    for name in ("README.md", "README.zh.md"):
+        text = (ROOT / name).read_text(encoding="utf-8")
+        refs = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", text)
+        assert refs, f"{name} shows no screenshot at all"
+        for ref in refs:
+            assert (ROOT / ref).is_file(), f"{name} references missing image {ref}"
+
+
+def test_readme_quickstart_matches_shipped_examples():
+    """The first command a reader runs must name files that are actually here."""
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    for path in ("examples/demo_room.glb", "examples/demo_room_targets.json"):
+        assert path in text, f"the quickstart no longer mentions {path}"
+        assert (ROOT / path).is_file(), f"{path} is in the quickstart but not in the repo"

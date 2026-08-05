@@ -4,15 +4,27 @@
 
 [中文说明](README.zh.md)
 
+![The meshmark annotator: a 3D view of a scanned operating room on the left, a metric top-down plate on the right](docs/annotator.jpg)
+
+<sub>A photogrammetry scan of a real operating room, annotated. Yellow: fitted boxes. Red: the positions a ground-truth file claims. Cyan: a person's route across the floor. The panel on the right is the same object seen from directly above, at 6.2 mm per pixel.</sub>
+
 Point it at a mesh. Get a two-view annotator that writes oriented boxes, class
 labels in English and Chinese, and named floor routes, as JSON.
 
 ```bash
 npm install three                        # once, anywhere
 pip install -e .
-meshmark build room.glb --out .annotate/room --classes generic
-meshmark serve .annotate/room --open
+meshmark build examples/demo_room.glb --out .annotate/demo \
+    --classes operating-room --targets examples/demo_room_targets.json
+meshmark serve .annotate/demo --open
 ```
+
+A demo room ships with the repo, so there is something to run before you have a
+mesh of your own. Its floor sits at 0.12 m rather than 0, two objects touch, and
+one reference position names an object that is not in the room -- finding that
+out is the job.
+
+![The same annotator on the synthetic demo room that ships with the repository](docs/demo-room.png)
 
 No Blender. No preprocessing. No network — a built bundle is a static directory
 that makes zero outbound requests.

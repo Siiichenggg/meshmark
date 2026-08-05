@@ -1,0 +1,19 @@
+{
+  "_comment": "Reference positions for examples/demo_room.glb, so the quickstart shows the workflow this tool exists for rather than an empty room. Several are deliberately wrong -- the trolley by 0.31 m, the stool by 0.22 m, the monitor by 0.18 m -- and one names an object that is not in the room at all. Finding that out is the job.",
+  "objects": [
+    {"object_id": "demo_operating_table_001", "label": "operating table", "world_xy": [0.10, 0.15], "footprint_radius_m": 0.95},
+    {"object_id": "demo_anesthesia_machine_001", "label": "anesthesia machine", "world_xy": [-1.62, 1.30], "footprint_radius_m": 0.45},
+    {"object_id": "demo_cabinet_001", "label": "cabinet", "world_xy": [-2.72, -0.60], "footprint_radius_m": 0.60},
+    {"object_id": "demo_shelf_001", "label": "shelf", "world_xy": [2.78, 0.90], "footprint_radius_m": 0.82},
+    {"object_id": "demo_cart_001", "label": "trolley", "world_xy": [2.05, -0.14], "footprint_radius_m": 0.42},
+    {"object_id": "demo_counter_001", "label": "counter", "world_xy": [0.60, -2.10], "footprint_radius_m": 0.98},
+    {"object_id": "demo_sink_001", "label": "sink", "world_xy": [0.10, -2.10], "footprint_radius_m": 0.32},
+    {"object_id": "demo_stool_001", "label": "stool", "world_xy": [-0.79, -0.90], "footprint_radius_m": 0.30},
+    {"object_id": "demo_trash_can_001", "label": "trash can", "world_xy": [-2.55, -1.95], "footprint_radius_m": 0.25},
+    {"object_id": "demo_iv_pole_001", "label": "IV pole", "world_xy": [1.05, 1.55], "footprint_radius_m": 0.20},
+    {"object_id": "demo_patient_monitor_001", "label": "patient monitor", "world_xy": [-0.92, 1.92], "footprint_radius_m": 0.30},
+    {"object_id": "demo_equipment_tower_001", "label": "equipment tower", "world_xy": [2.60, -1.75], "footprint_radius_m": 0.36},
+    {"object_id": "demo_supply_box_001", "label": "box", "world_xy": [-2.60, 1.95], "footprint_radius_m": 0.35},
+    {"object_id": "demo_infusion_pump_001", "label": "infusion pump", "world_xy": [1.85, 1.90], "footprint_radius_m": 0.25, "note": "not in the room -- mark it absent"}
+  ]
+}
