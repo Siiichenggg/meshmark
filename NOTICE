@@ -10,3 +10,8 @@ at. three.js is not redistributed in this repository.
 The bundle directory that `meshmark build` writes is yours. It contains a
 copy of whatever mesh you pointed it at, under whatever terms that mesh
 carries -- meshmark makes no claim on it and does not check it.
+
+docs/annotator.jpg shows a photogrammetry scan of an operating room, published
+here with the permission of its owner. It is not part of this project and is
+not covered by the MIT licence above; it is illustration only. The scene shipped
+in examples/ is synthetic and is covered by the licence.
