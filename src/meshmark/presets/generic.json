@@ -1,0 +1,23 @@
+{
+  "name": "generic",
+  "display": {"en": "Generic indoor", "zh": "通用室内"},
+  "note": {
+    "en": "A starting point for a scene that is not an operating room. Copy this file, change the classes, pass it with --classes.",
+    "zh": "非手术室场景的起点。复制这个文件，改掉类别，然后用 --classes 传进来。"
+  },
+  "classes": [
+    {"id": "table",     "en": "table",     "zh": "桌子",   "size_m": [1.20, 0.70, 0.75]},
+    {"id": "desk",      "en": "desk",      "zh": "书桌",   "size_m": [1.40, 0.65, 0.75]},
+    {"id": "chair",     "en": "chair",     "zh": "椅子",   "size_m": [0.55, 0.55, 0.90]},
+    {"id": "sofa",      "en": "sofa",      "zh": "沙发",   "size_m": [1.90, 0.90, 0.80]},
+    {"id": "cabinet",   "en": "cabinet",   "zh": "柜子",   "size_m": [0.90, 0.45, 1.80]},
+    {"id": "shelf",     "en": "shelf",     "zh": "架子",   "size_m": [1.00, 0.35, 1.80]},
+    {"id": "bed",       "en": "bed",       "zh": "床",     "size_m": [1.50, 2.00, 0.55]},
+    {"id": "door",      "en": "door",      "zh": "门",     "size_m": [0.90, 0.10, 2.05]},
+    {"id": "appliance", "en": "appliance", "zh": "家电",   "size_m": [0.60, 0.60, 0.90]},
+    {"id": "box",       "en": "box",       "zh": "箱子",   "size_m": [0.50, 0.40, 0.40]},
+    {"id": "plant",     "en": "plant",     "zh": "植物",   "size_m": [0.45, 0.45, 1.10]},
+    {"id": "person",    "en": "person",    "zh": "人",     "size_m": [0.50, 0.35, 1.70]},
+    {"id": "other",     "en": "other",     "zh": "其他",   "size_m": [0.50, 0.50, 0.80]}
+  ]
+}

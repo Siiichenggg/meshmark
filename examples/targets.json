@@ -1,0 +1,8 @@
+{
+  "_comment": "An example --targets file: positions to annotate against. Each is drawn as a ring you confirm, correct, or mark absent. Field names are read loosely -- see README. Anything meshmark does not model, such as 'dynamic' below, comes back untouched in the export under source_fields.",
+  "objects": [
+    {"object_id": "wh_pallet_stack_001", "label": "pallet stack", "world_xy": [-3.20, 1.85], "footprint_radius_m": 0.72},
+    {"object_id": "wh_forklift_001", "label": "forklift", "world_xy": [1.05, -2.40], "footprint_radius_m": 1.25, "dynamic": true},
+    {"object_id": "wh_workbench_001", "label": "workbench", "world_xy": [2.90, 0.15], "footprint_radius_m": 0.98}
+  ]
+}

@@ -1,0 +1,125 @@
+:root {
+  --bg: #14161a;
+  --panel: #1c1f26;
+  --line: #2b3039;
+  --ink: #e8eaed;
+  --dim: #8a919e;
+  --ref: #ff5555;
+  --ann: #ffc83d;
+  --ok: #3ddc84;
+  --absent: #7a8290;
+  --route: #35d0ff;
+  --fixed: #ff7ad0;
+}
+* { box-sizing: border-box }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans CJK SC", sans-serif;
+  display: grid; grid-template-columns: 260px 1fr 350px; height: 100vh; overflow: hidden;
+}
+.panel { background: var(--panel); overflow-y: auto; padding: 12px }
+.panel.left { border-right: 1px solid var(--line) }
+.panel.right { border-left: 1px solid var(--line) }
+
+.brand {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  font: 600 13px/1 ui-monospace, monospace; letter-spacing: .06em; color: var(--dim);
+}
+.brand span { flex: 1 }
+.mini { padding: 3px 8px !important; font-size: 11px !important }
+
+h2 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--dim); margin: 14px 0 8px;
+}
+h2 .inline {
+  float: right; font-size: 11px; text-transform: none; letter-spacing: 0;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.soft { color: var(--dim); font-weight: 400 }
+.mono { font: 13px/1.4 ui-monospace, monospace; word-break: break-all }
+
+.item {
+  padding: 6px 8px; border-radius: 6px; cursor: pointer; display: flex; gap: 8px;
+  align-items: center; border: 1px solid transparent;
+}
+.item:hover { background: #252932 }
+.item.sel { background: #2c3140; border-color: #4a5266 }
+.item .nm { flex: 1; font-size: 12px; word-break: break-all }
+/* A generous hit area on purpose: at 16px of dim glyph the delete was there and
+   effectively unclickable, which reads as "added objects cannot be removed". */
+.del {
+  color: #98a0ad; padding: 6px 9px; margin: -6px -4px -6px 0; font-size: 17px;
+  line-height: 1; border-radius: 5px; flex: none;
+}
+.del:hover { color: #fff; background: #6d3a3a }
+
+.tabs { display: flex; gap: 4px; margin-bottom: 8px }
+.tabs button { flex: 1; padding: 4px 0; font-size: 12px }
+.tabs button.on { background: #2f5db0; border-color: #3b6fca }
+
+select, textarea, input[type=number] {
+  background: #14171d; color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px; font-size: 12.5px;
+}
+select { width: 100% }
+textarea { width: 100%; height: 52px; resize: vertical; font: 12px system-ui }
+input[type=number] { width: 70px; padding: 3px 6px; font: 12px ui-monospace, monospace }
+input[type=range] { width: 100% }
+
+button {
+  background: #2a2f3a; color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 9px; cursor: pointer; font-size: 13px;
+}
+button:hover { background: #333947 }
+button:disabled { opacity: .45; cursor: default }
+button.primary { background: #2f5db0; border-color: #3b6fca }
+button.warn { background: #5a3030; border-color: #6d3a3a }
+.row { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 }
+.row.dims { align-items: center }
+.row.dims label { font-size: 12px; color: var(--dim) }
+
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #4a5060; flex: none }
+.dot.confirmed, .dot.corrected, .dot.added { background: var(--ok) }
+.dot.absent { background: var(--absent) }
+.swatch {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  vertical-align: baseline;
+}
+.swatch.ref { background: var(--fixed) }
+
+#view { position: relative; overflow: hidden; background: #0d0f12 }
+#view canvas { display: block }
+.hud {
+  position: absolute; left: 10px; bottom: 10px; background: #000a; padding: 6px 10px;
+  border-radius: 6px; font: 12px ui-monospace, monospace; color: #cfd4dd;
+  pointer-events: none; white-space: pre;
+}
+.bar {
+  position: absolute; left: 10px; top: 10px; background: #000a; padding: 6px 10px;
+  border-radius: 6px; font: 12px ui-monospace, monospace; color: #cfd4dd;
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; max-width: calc(100% - 20px);
+}
+.bar label { color: var(--dim) }
+.bar input[type=range] { width: 110px }
+#loading {
+  position: absolute; inset: 0; display: grid; place-items: center; color: var(--dim);
+  font: 13px ui-monospace, monospace; background: #0d0f12; text-align: center; padding: 20px;
+}
+#loading.error { color: #ff8f8f }
+
+#plan {
+  width: 100%; aspect-ratio: 1; border-radius: 6px; border: 1px solid var(--line);
+  background: #0d0f12; display: block; cursor: crosshair;
+}
+.kv {
+  display: grid; grid-template-columns: auto 1fr; gap: 3px 10px;
+  font: 12px ui-monospace, monospace; color: #cfd4dd; margin: 8px 0;
+}
+.kv b { color: var(--dim); font-weight: 400 }
+small { color: var(--dim); display: block }
+.tag {
+  font: 11px ui-monospace, monospace; padding: 1px 6px; border-radius: 99px;
+  border: 1px solid var(--line); display: inline-block;
+}
+.stale { color: #ffc83d }

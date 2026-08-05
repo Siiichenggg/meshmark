@@ -1,0 +1,35 @@
+{
+  "name": "operating-room",
+  "display": {"en": "Operating room", "zh": "手术室"},
+  "note": {
+    "en": "Nominal equipment sizes, not measurements. They exist so placing an object is one click instead of one click plus three number entries; every box is meant to be dragged to fit, and the export records what was dragged.",
+    "zh": "标称设备尺寸，不是测量值。它们的作用是让放置一个物体只需点一下，而不是点一下再填三个数字；每个框都应该拖到贴合为止，导出会记录拖过之后的结果。"
+  },
+  "classes": [
+    {"id": "trash_can",          "en": "trash can",           "zh": "垃圾桶",         "size_m": [0.40, 0.40, 0.80]},
+    {"id": "cart",               "en": "cart",                "zh": "推车",           "size_m": [0.70, 0.50, 0.95]},
+    {"id": "instrument_tray",    "en": "instrument tray",     "zh": "器械台",         "size_m": [0.60, 0.40, 0.90]},
+    {"id": "operating_table",    "en": "operating table",     "zh": "手术台",         "size_m": [0.70, 2.10, 0.90]},
+    {"id": "bed",                "en": "bed",                 "zh": "病床",           "size_m": [0.95, 2.10, 0.75]},
+    {"id": "cabinet",            "en": "cabinet",             "zh": "柜子",           "size_m": [0.90, 0.50, 1.80]},
+    {"id": "shelf",              "en": "shelf",               "zh": "储物架",         "size_m": [1.00, 0.40, 1.80]},
+    {"id": "counter",            "en": "counter",             "zh": "台面/工作台",    "size_m": [1.20, 0.60, 0.90]},
+    {"id": "anesthesia_machine", "en": "anesthesia machine",  "zh": "麻醉机",         "size_m": [0.70, 0.60, 1.45]},
+    {"id": "monitor",            "en": "monitor",             "zh": "显示器",         "size_m": [0.60, 0.20, 0.55]},
+    {"id": "equipment_tower",    "en": "equipment tower",     "zh": "设备塔/主机架",  "size_m": [0.55, 0.55, 1.30]},
+    {"id": "infusion_pump",      "en": "infusion pump",       "zh": "输液泵",         "size_m": [0.35, 0.30, 1.20]},
+    {"id": "stool",              "en": "stool",               "zh": "圆凳",           "size_m": [0.55, 0.55, 0.60]},
+    {"id": "chair",              "en": "chair",               "zh": "椅子",           "size_m": [0.60, 0.60, 0.95]},
+    {"id": "iv_pole",            "en": "IV pole",             "zh": "输液架",         "size_m": [0.30, 0.30, 1.80]},
+    {"id": "waste_bag_trolley",  "en": "waste bag trolley",   "zh": "垃圾袋车",       "size_m": [0.60, 0.50, 1.00]},
+    {"id": "fluid_waste_system", "en": "fluid waste system",  "zh": "液体废物处理机", "size_m": [0.55, 0.55, 1.30]},
+    {"id": "sharps_container",   "en": "sharps container",    "zh": "利器盒",         "size_m": [0.25, 0.20, 0.35]},
+    {"id": "sink",               "en": "sink",                "zh": "洗手池",         "size_m": [0.60, 0.50, 0.90]},
+    {"id": "surgical_light",     "en": "surgical light",      "zh": "无影灯",         "size_m": [0.80, 0.80, 0.40]},
+    {"id": "medical_pendant",    "en": "medical pendant",     "zh": "吊塔",           "size_m": [0.50, 0.50, 1.20]},
+    {"id": "door",               "en": "door",                "zh": "门",             "size_m": [0.90, 0.12, 2.10]},
+    {"id": "box",                "en": "box",                 "zh": "箱子",           "size_m": [0.50, 0.40, 0.40]},
+    {"id": "person",             "en": "person",              "zh": "人",             "size_m": [0.50, 0.35, 1.70]},
+    {"id": "other",              "en": "other",               "zh": "其他",           "size_m": [0.50, 0.50, 0.80]}
+  ]
+}

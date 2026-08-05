@@ -1,0 +1,22 @@
+{
+  "name": "warehouse",
+  "display": {"en": "Warehouse", "zh": "仓库"},
+  "note": {
+    "en": "An example of a preset written from scratch. Pass it with --classes examples/warehouse.json.",
+    "zh": "一个从零写起的预设示例。用 --classes examples/warehouse.json 传进来。"
+  },
+  "classes": [
+    {"id": "pallet",        "en": "pallet",        "zh": "托盘",     "size_m": [1.20, 0.80, 0.15]},
+    {"id": "pallet_stack",  "en": "pallet stack",  "zh": "码垛",     "size_m": [1.20, 0.80, 1.60]},
+    {"id": "shelving_bay",  "en": "shelving bay",  "zh": "货架单元", "size_m": [2.70, 1.10, 4.00]},
+    {"id": "forklift",      "en": "forklift",      "zh": "叉车",     "size_m": [2.20, 1.15, 2.10]},
+    {"id": "pallet_jack",   "en": "pallet jack",   "zh": "地牛",     "size_m": [1.60, 0.68, 1.20]},
+    {"id": "cage_trolley",  "en": "cage trolley",  "zh": "笼车",     "size_m": [1.20, 0.80, 1.70]},
+    {"id": "conveyor",      "en": "conveyor",      "zh": "输送线",   "size_m": [3.00, 0.60, 0.85]},
+    {"id": "workbench",     "en": "workbench",     "zh": "工作台",   "size_m": [1.80, 0.75, 0.90]},
+    {"id": "dock_door",     "en": "dock door",     "zh": "装卸门",   "size_m": [2.60, 0.20, 3.00]},
+    {"id": "column",        "en": "column",        "zh": "立柱",     "size_m": [0.40, 0.40, 6.00]},
+    {"id": "person",        "en": "person",        "zh": "人",       "size_m": [0.50, 0.35, 1.70]},
+    {"id": "other",         "en": "other",         "zh": "其他",     "size_m": [0.60, 0.60, 0.90]}
+  ]
+}
