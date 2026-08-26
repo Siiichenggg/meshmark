@@ -10,7 +10,7 @@
 
 ![The meshmark annotator: a 3D view of a scanned operating room on the left, a metric top-down view of one object on the right](docs/annotator.jpg)
 
-<sub>A photogrammetry scan of an operating room, mid-annotation. Yellow: boxes drawn around objects. Red: the positions a reference file claims. Cyan: a route traced across the floor. Top right: the same object from directly above, at 6.2 mm per pixel.</sub>
+<sub>A photogrammetry scan of an operating room, mid-annotation. Yellow: boxes drawn around objects. Red: the positions a reference file claims. Cyan: a route traced across the floor. Top right: the same object from directly above, at 6.9 mm per pixel.</sub>
 
 meshmark turns a 3D scan of a room into a web page where you draw oriented boxes
 around the objects in it and trace routes across its floor, then exports both as
