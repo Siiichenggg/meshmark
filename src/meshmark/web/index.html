@@ -31,107 +31,137 @@ window.__meshmarkErrors = [];
 })();
 </script>
 
-<div class="panel left">
-  <div class="brand">
-    <span>meshmark</span>
-    <button id="langbtn" class="mini" title="English / 中文"></button>
-  </div>
-
-  <h2 data-i18n="add.title"></h2>
-  <select id="cls"></select>
-  <div class="row">
-    <button id="addbtn" style="flex:1"></button>
-  </div>
-  <small data-i18n-html="add.hint"></small>
-
-  <h2 data-i18n="routes.title"></h2>
-  <select id="routesel"></select>
-  <div class="row">
-    <button id="pathbtn" style="flex:1"></button>
-    <button id="undobtn" data-i18n="routes.undo"></button>
-  </div>
-  <div class="row">
-    <button id="routenew" data-i18n="routes.new"></button>
-    <button id="routerename" data-i18n="routes.rename"></button>
-    <button id="routedel" class="warn" data-i18n="routes.delete"></button>
-  </div>
-  <small id="pathinfo"></small>
-  <small id="refinfo"></small>
-
-  <h2>
-    <span data-i18n="list.title"></span> <span id="progress" class="soft"></span>
-    <label class="inline">
-      <input type="checkbox" id="showrefs" checked> <span data-i18n="list.showRefs"></span>
-    </label>
-    <label class="inline">
-      <input type="checkbox" id="focuscur"> <span data-i18n="list.focusCur"></span>
-    </label>
-  </h2>
-  <div class="tabs">
-    <button data-f="all" data-i18n="list.all"></button>
-    <button data-f="reference" data-i18n="list.refs"></button>
-    <button data-f="added" data-i18n="list.added"></button>
-  </div>
-  <div id="list"></div>
-
-  <div class="row" style="margin-top:14px">
-    <button class="primary" id="exportbtn" data-i18n="io.export"></button>
-    <button id="importbtn" data-i18n="io.import"></button>
-    <button class="warn" id="resetbtn" data-i18n="io.reset"></button>
-    <input id="imp" type="file" accept="application/json" hidden>
-  </div>
-  <small data-i18n="io.autosave"></small>
-</div>
-
 <div id="view">
-  <div class="bar">
-    <span data-i18n="view.mode3d"></span>
-    <label><span data-i18n="view.cut"></span> <span id="cutval">1.60</span> m</label>
-    <input type="range" id="cut" min="0.2" max="4.0" step="0.05" value="1.6">
-    <button id="framebtn" data-i18n="view.frame"></button>
-    <span id="baseline" class="soft"></span>
-  </div>
-  <div class="hud" id="hud"></div>
   <div id="loading"></div>
 </div>
 
-<div class="panel right">
-  <div id="title" class="mono"></div>
-  <div id="lbl"></div>
-  <div class="row" style="margin:6px 0 0">
-    <select id="relabel" style="flex:1"></select>
-  </div>
-  <small id="lblnote"></small>
+<header>
+  <h1>meshmark</h1>
+  <span class="sub" id="baseline"></span>
+  <span class="tools">
+    <button id="langbtn" class="mini" title="English / 中文"></button>
+    <button id="helpbtn" class="mini"></button>
+  </span>
+</header>
 
+<div id="panel">
+  <div class="card">
+    <h2 data-i18n="view.title"></h2>
+    <div class="slider-row">
+      <span data-i18n="view.cut"></span>
+      <input type="range" id="cut" min="0.2" max="4.0" step="0.05" value="1.6">
+      <span class="num"><span id="cutval">1.60</span> m</span>
+    </div>
+    <label class="check">
+      <input type="checkbox" id="showrefs" checked> <span data-i18n="list.showRefs"></span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="focuscur"> <span data-i18n="list.focusCur"></span>
+    </label>
+    <div class="row"><button id="framebtn" style="flex:1" data-i18n="view.frame"></button></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="add.title"></h2>
+    <select id="cls"></select>
+    <div class="row"><button id="addbtn" style="flex:1"></button></div>
+    <small data-i18n-html="add.hint"></small>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="routes.title"></h2>
+    <select id="routesel"></select>
+    <div class="row">
+      <button id="pathbtn" style="flex:1"></button>
+      <button id="undobtn" data-i18n="routes.undo"></button>
+    </div>
+    <div class="row">
+      <button id="routenew" data-i18n="routes.new"></button>
+      <button id="routerename" data-i18n="routes.rename"></button>
+      <button id="routedel" class="warn" data-i18n="routes.delete"></button>
+    </div>
+    <small id="pathinfo"></small>
+    <small id="refinfo"></small>
+  </div>
+
+  <div class="card" id="listcard">
+    <h2>
+      <span data-i18n="list.title"></span>
+      <span id="progress" class="soft"></span>
+    </h2>
+    <div class="tabs">
+      <button data-f="all" data-i18n="list.all"></button>
+      <button data-f="reference" data-i18n="list.refs"></button>
+      <button data-f="added" data-i18n="list.added"></button>
+    </div>
+    <div id="list"></div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <button class="primary" id="exportbtn" data-i18n="io.export"></button>
+      <button id="importbtn" data-i18n="io.import"></button>
+      <button class="warn" id="resetbtn" data-i18n="io.reset"></button>
+      <input id="imp" type="file" accept="application/json" hidden>
+    </div>
+    <small data-i18n="io.autosave"></small>
+  </div>
+</div>
+
+<div id="right">
+<div class="card" id="inset">
   <h2 data-i18n="topdown.title"></h2>
   <canvas id="topdown"></canvas>
   <small id="scale"></small>
+</div>
+
+<div class="card" id="editcard">
+  <div id="title" class="mono"></div>
+  <div id="lbl"></div>
+  <select id="relabel"></select>
+  <small id="lblnote"></small>
+
+  <table class="fields">
+    <tr>
+      <td data-i18n="obj.cx"></td><td><input type="number" id="cx" step="0.01"></td>
+      <td data-i18n="obj.cy"></td><td><input type="number" id="cy" step="0.01"></td>
+    </tr>
+    <tr>
+      <td data-i18n="obj.w"></td><td><input type="number" id="w" step="0.05" min="0.05"></td>
+      <td data-i18n="obj.d"></td><td><input type="number" id="d" step="0.05" min="0.05"></td>
+    </tr>
+    <tr>
+      <td data-i18n="obj.yaw"></td><td><span id="yawv" class="num"></span></td>
+      <td data-i18n="obj.h"></td><td><input type="number" id="h" step="0.05" min="0.05"></td>
+    </tr>
+    <tr><td colspan="4"><input type="range" id="yaw" min="-90" max="90" step="1" value="0"></td></tr>
+  </table>
 
   <div class="kv" id="readout"></div>
 
-  <div class="row dims">
-    <label data-i18n="obj.w"></label><input type="number" id="w" step="0.05" min="0.05">
-    <label data-i18n="obj.d"></label><input type="number" id="d" step="0.05" min="0.05">
-    <label data-i18n="obj.h"></label><input type="number" id="h" step="0.05" min="0.05">
-  </div>
-  <div><span data-i18n="obj.yaw"></span> <span id="yawv" class="mono"></span></div>
-  <input type="range" id="yaw" min="-90" max="90" step="1" value="0">
-
   <div class="row">
-    <button id="confirmbtn" data-i18n="obj.confirm"></button>
+    <button class="primary" id="confirmbtn" data-i18n="obj.confirm"></button>
     <button class="warn" id="absentbtn" data-i18n="obj.absent"></button>
     <button id="clearbtn" data-i18n="obj.clear"></button>
   </div>
-  <div class="row">
+  <div class="row nav">
     <button id="prevbtn" data-i18n="obj.prev"></button>
-    <button class="primary" id="nextbtn" data-i18n="obj.next"></button>
+    <span id="navpos"></span>
+    <button id="nextbtn" data-i18n="obj.next"></button>
   </div>
 
   <textarea id="note"></textarea>
+</div>
+</div>
 
+<div class="card" id="helpcard">
+  <button class="close" id="helpclose"></button>
   <h2 data-i18n="help.title"></h2>
   <small data-i18n-html="help.body"></small>
 </div>
+
+<div id="hint" data-i18n-html="help.pill"></div>
+<div class="hud" id="hud"></div>
 
 <script type="module" src="./app.js"></script>
 </body>

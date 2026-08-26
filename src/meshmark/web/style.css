@@ -1,135 +1,288 @@
+/* meshmark's surface: one palette, three states.
+ *
+ * Every colour on the page -- and every colour drawn into the two canvases, via
+ * palette() in app.js -- resolves through these variables. A hex literal in a
+ * component is a colour with no home: it survives one theme and betrays the
+ * other, and nothing in a screenshot says which one you are looking at.
+ *
+ * Three states, not two. An explicit choice is stamped on the root element and
+ * must win over the system preference in BOTH directions, so the dark set is
+ * written twice: once behind the media query for the default "follow the
+ * system" case, once behind [data-theme] for the case where someone has said
+ * otherwise. The light set on bare :root is the fallback both fall back to.
+ */
 :root {
-  --bg: #14161a;
-  --panel: #1c1f26;
-  --line: #2b3039;
-  --ink: #e8eaed;
-  --dim: #8a919e;
-  --ref: #ff5555;
-  --ann: #ffc83d;
-  --ok: #3ddc84;
-  --absent: #7a8290;
-  --route: #35d0ff;
-  --fixed: #ff7ad0;
+  --bg: #F2F4F3;
+  --panel: #FBFCFB;
+  --panel-tr: rgba(251, 252, 251, .92);
+  --ink: #232A2C;
+  --muted: #6B7876;
+  --line: #D6DDDA;
+  --grid: #E0E6E3;
+  --floor: #EDF0EE;
+  /* Semantic, not decorative: gt = a verdict accepted, est = a measurement made
+     here, bad = the reference we are checking against, cam = focus. */
+  --gt: #1F8A78;
+  --est: #D9822B;
+  --bad: #C43D56;
+  --cam: #4A6FA0;
+  --sel: #232A2C;
+  /* Markers are drawn, never edited, and read the same in either theme: the one
+     colour on the page that is deliberately not a pair. */
+  --marker: #FF7AD0;
 }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141819;
+    --panel: #1C2223;
+    --panel-tr: rgba(28, 34, 35, .92);
+    --ink: #E3E9E6;
+    --muted: #8FA09B;
+    --line: #2C3538;
+    --grid: #232B2D;
+    --floor: #181E1F;
+    --gt: #3FB39E;
+    --est: #E29A4D;
+    --bad: #E0607A;
+    --cam: #7C9CC9;
+    --sel: #E3E9E6;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141819;
+  --panel: #1C2223;
+  --panel-tr: rgba(28, 34, 35, .92);
+  --ink: #E3E9E6;
+  --muted: #8FA09B;
+  --line: #2C3538;
+  --grid: #232B2D;
+  --floor: #181E1F;
+  --gt: #3FB39E;
+  --est: #E29A4D;
+  --bad: #E0607A;
+  --cam: #7C9CC9;
+  --sel: #E3E9E6;
+}
+
 * { box-sizing: border-box }
+html, body { height: 100% }
 body {
-  margin: 0; background: var(--bg); color: var(--ink);
+  margin: 0; background: var(--bg); color: var(--ink); overflow: hidden;
   font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans CJK SC", sans-serif;
-  display: grid; grid-template-columns: 260px 1fr 350px; height: 100vh; overflow: hidden;
 }
-.panel { background: var(--panel); overflow-y: auto; padding: 12px }
-.panel.left { border-right: 1px solid var(--line) }
-.panel.right { border-left: 1px solid var(--line) }
 
-.brand {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
-  font: 600 13px/1 ui-monospace, monospace; letter-spacing: .06em; color: var(--dim);
+/* ------------------------------------------------------------------ the view
+ *
+ * The mesh is the page. Everything else floats over it, because the one thing a
+ * three-panel grid could never give was a room wide enough to recognise what is
+ * in it -- and recognising the object is the whole job. */
+#view { position: fixed; inset: 0; overflow: hidden; background: var(--floor) }
+/* Belt and braces against the HiDPI trap in resize3d(): even if something writes
+   a drawing-buffer size without a style, the element still fills its box. */
+#view canvas { display: block; width: 100%; height: 100% }
+#loading {
+  position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted);
+  font: 13px ui-monospace, monospace; background: var(--bg); text-align: center; padding: 20px;
 }
-.brand span { flex: 1 }
-.mini { padding: 3px 8px !important; font-size: 11px !important }
+#loading.error { color: var(--bad) }
 
-h2 {
-  font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
-  color: var(--dim); margin: 14px 0 8px;
-  /* Flex rather than a floated child. Floated, the "show references" control
-     sat outside the heading's flow and overlapped the filter tabs below it as
-     soon as the heading text grew -- which it does the moment the progress
-     counter reaches double digits, or the language changes. */
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+/* ---------------------------------------------------------------- the header */
+
+header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 4;
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  padding: 12px 18px 10px;
+  /* Faded into the scene rather than sitting on a bar: the mesh runs under it,
+     and a hard edge across the top of a room reads as the render being cut. */
+  background: linear-gradient(var(--bg), transparent);
+  pointer-events: none;
 }
-h2 .inline {
-  margin-left: auto; font-size: 11px; text-transform: none; letter-spacing: 0;
-  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+header h1 { margin: 0; font: 650 15px/1 ui-monospace, monospace; letter-spacing: .04em }
+header .sub { color: var(--muted); font-size: 12px }
+header .tools { margin-left: auto; display: flex; gap: 6px; pointer-events: auto }
+
+/* ------------------------------------------------------------------- cards */
+
+#panel {
+  position: fixed; left: 16px; top: 60px; bottom: 16px; z-index: 5; width: 260px;
+  /* Tight on purpose: five cards and the object list all live in this column,
+     and every pixel of padding above comes out of the number of rows a person
+     can see at once. */
+  display: flex; flex-direction: column; gap: 8px;
+  /* The column is a layout, not a surface -- clicks between the cards belong to
+     the mesh underneath. Each card takes its own back. A wheel over a card still
+     scrolls this, because the browser looks for a scrollable ancestor rather
+     than a clickable one. */
+  pointer-events: none; overflow-y: auto; scrollbar-width: thin;
 }
-/* Only the first of a run gets pushed to the right; the rest follow it, so two
-   view switches read as one group instead of one per line. */
-h2 .inline + .inline { margin-left: 8px }
-.soft { color: var(--dim); font-weight: 400 }
-.mono { font: 13px/1.4 ui-monospace, monospace; word-break: break-all }
+.card {
+  background: var(--panel-tr); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 12px; pointer-events: auto; backdrop-filter: blur(6px);
+}
+.card h2 {
+  margin: 0 0 6px; font-size: 10.5px; font-weight: 650; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .1em;
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+}
+.card > .row:first-child { margin-top: 0 }
+.soft { color: var(--muted); font-weight: 400; letter-spacing: 0; text-transform: none }
+.mono { font: 12.5px/1.4 ui-monospace, monospace; word-break: break-all }
+.num, .kv, .item, #list, #navpos, input[type=number] { font-variant-numeric: tabular-nums }
+small { color: var(--muted); display: block; font-size: 11.5px; line-height: 1.45 }
+
+/* The list card takes what the other four leave, but never less than its
+   heading, its tabs and a couple of rows: squeezed to a sliver it stops being a
+   list, and the column scrolls instead. The floor belongs on the card -- put on
+   the scrolling list inside it, the card shrinks anyway and clips it. */
+#listcard { flex: 1; min-height: 142px; display: flex; flex-direction: column }
+#list { overflow-y: auto; flex: 1; min-height: 0; margin: 0 -4px }
+
+/* --------------------------------------------------------------- the list */
 
 .item {
-  padding: 6px 8px; border-radius: 6px; cursor: pointer; display: flex; gap: 8px;
-  align-items: center; border: 1px solid transparent;
+  display: flex; gap: 6px; align-items: baseline; padding: 3px 4px; border-radius: 4px;
+  cursor: pointer; font-size: 12.5px;
 }
-.item:hover { background: #252932 }
-.item.sel { background: #2c3140; border-color: #4a5266 }
-.item .nm { flex: 1; font-size: 12px; word-break: break-all }
+.item:hover { background: var(--grid) }
+.item.sel { outline: 1.5px solid var(--sel) }
+/* An icon, not a coloured dot. Six statuses cannot be told apart by hue at 9px
+   -- and the two that matter most, "confirmed" and "corrected", were the same
+   green. A glyph says which without a legend. */
+.item .icon { flex: none; width: 16px; text-align: center; font-size: 11.5px; line-height: 1.4 }
+.item .nm { flex: 1; word-break: break-all }
+/* Struck through but still live: this row is the only way back from "nothing
+   here", so it has to stay clickable while it reads as ruled out. */
+.item.absent { text-decoration: line-through; opacity: .6 }
 /* A generous hit area on purpose: at 16px of dim glyph the delete was there and
    effectively unclickable, which reads as "added objects cannot be removed". */
 .del {
-  color: #98a0ad; padding: 6px 9px; margin: -6px -4px -6px 0; font-size: 17px;
+  color: var(--muted); padding: 4px 7px; margin: -4px -3px -4px 0; font-size: 15px;
   line-height: 1; border-radius: 5px; flex: none;
 }
-.del:hover { color: #fff; background: #6d3a3a }
+.del:hover { color: var(--bad); background: var(--grid) }
 
 .tabs { display: flex; gap: 4px; margin-bottom: 8px }
-.tabs button { flex: 1; padding: 4px 0; font-size: 12px }
-.tabs button.on { background: #2f5db0; border-color: #3b6fca }
+.tabs button { flex: 1; padding: 3px 0; font-size: 11.5px }
+.tabs button.on { background: var(--gt); border-color: var(--gt); color: var(--bg) }
 
-select, textarea, input[type=number] {
-  background: #14171d; color: var(--ink); border: 1px solid var(--line);
-  border-radius: 6px; padding: 6px; font-size: 12.5px;
+/* ------------------------------------------------------------------ controls */
+
+select, textarea, input[type=number], input[type=text] {
+  background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 5px; padding: 4px 6px; font-size: 12px;
 }
-select { width: 100% }
-textarea { width: 100%; height: 52px; resize: vertical; font: 12px system-ui }
-input[type=number] { width: 70px; padding: 3px 6px; font: 12px ui-monospace, monospace }
-input[type=range] { width: 100% }
+select { width: 100%; padding: 5px 6px }
+textarea { width: 100%; height: 44px; resize: vertical; font: 12px system-ui; margin-top: 8px }
+input[type=number] { width: 100%; padding: 2px 5px; font: 12px ui-monospace, monospace }
+input[type=range] { width: 100%; accent-color: var(--gt) }
 
 button {
-  background: #2a2f3a; color: var(--ink); border: 1px solid var(--line);
-  border-radius: 6px; padding: 6px 9px; cursor: pointer; font-size: 13px;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 9px; cursor: pointer; font-size: 12.5px;
 }
-button:hover { background: #333947 }
+button:hover { background: var(--grid) }
 button:disabled { opacity: .45; cursor: default }
-button.primary { background: #2f5db0; border-color: #3b6fca }
-button.warn { background: #5a3030; border-color: #6d3a3a }
-.row { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 }
-.row.dims { align-items: center }
-.row.dims label { font-size: 12px; color: var(--dim) }
+button.primary { background: var(--gt); border-color: var(--gt); color: var(--bg) }
+button.primary:hover { filter: brightness(1.08) }
+button.warn { color: var(--bad); border-color: var(--bad) }
+button.warn:hover { background: color-mix(in srgb, var(--bad) 14%, var(--panel)) }
+.mini { padding: 2px 7px; font-size: 11px }
+.row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 0 }
+.row + small { margin-top: 4px }
 
-.dot { width: 9px; height: 9px; border-radius: 50%; background: #4a5060; flex: none }
-.dot.confirmed, .dot.corrected, .dot.added { background: var(--ok) }
-.dot.absent { background: var(--absent) }
+.slider-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted) }
+.slider-row input[type=range] { flex: 1 }
+.check {
+  display: flex; align-items: center; gap: 7px; font-size: 12.5px; cursor: pointer;
+  padding: 2px 0; user-select: none;
+}
+.check input { accent-color: var(--gt) }
+
+/* Focus has to be visible on a page where half the controls are 11px glyphs. */
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--cam); outline-offset: 1px;
+}
+
+/* -------------------------------------------------------- the two side cards */
+
+/* The measuring instrument above, the verdict below, in one column.
+ *
+ * Both were fixed to their own corner first, and on a 1280x800 screen the edit
+ * card grew up over the top-down view and hid the half of it holding the object
+ * being edited. Sharing one column is what makes "they never overlap" a fact
+ * about the layout rather than a fact about the screen it was tried on. */
+#right {
+  position: fixed; right: 16px; top: 60px; bottom: 16px; z-index: 5; width: 320px;
+  display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+}
+#inset { flex: none }
+#topdown {
+  width: 100%; aspect-ratio: 1; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--floor); display: block; cursor: crosshair;
+}
+#scale { margin-top: 6px }
+
+/* Bottom of the column when there is room to spare, shrunk and scrolling when
+   there is not -- min-height:0 is what lets a flex item shrink past its content
+   at all. */
+#editcard { margin-top: auto; min-height: 0; overflow-y: auto }
+#title { color: var(--ink) }
+#editcard select { margin-top: 6px }
+.fields { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px }
+.fields td { padding: 2px 0; vertical-align: middle }
+.fields td:nth-child(odd) { color: var(--muted); width: 62px; padding-right: 6px }
+.fields td:nth-child(3) { padding-left: 8px }
+.kv {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 10px;
+  font: 11.5px ui-monospace, monospace; margin: 8px 0 0;
+}
+.kv b { color: var(--muted); font-weight: 400 }
+.tag {
+  font: 11px ui-monospace, monospace; padding: 0 6px; border-radius: 99px;
+  border: 1px solid var(--line); display: inline-block;
+}
+.row.nav { flex-wrap: nowrap; align-items: center }
+.row.nav button { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+#navpos { flex: none; font-size: 11.5px; color: var(--muted) }
+.stale { color: var(--est) }
 .swatch {
   display: inline-block; width: 9px; height: 9px; border-radius: 50%;
   vertical-align: baseline;
 }
-.swatch.ref { background: var(--fixed) }
+.swatch.ref { background: var(--marker) }
 
-#view { position: relative; overflow: hidden; background: #0d0f12 }
-/* Belt and braces against the HiDPI trap above: even if something writes a
-   drawing-buffer size without a style, the element still fills its box. */
-#view canvas { display: block; width: 100%; height: 100% }
+/* ------------------------------------------------------------ pills and help */
+
+/* Two readouts that must never take a click away from the mesh: the standing
+   hint, and the running state of the pass. */
+#hint, .hud {
+  position: fixed; bottom: 14px; z-index: 3; pointer-events: none;
+  background: var(--panel-tr); border: 1px solid var(--line); border-radius: 999px;
+  padding: 4px 14px; color: var(--muted); font-size: 11.5px; backdrop-filter: blur(6px);
+}
+#hint { left: 50%; transform: translateX(-50%); letter-spacing: .03em; max-width: calc(100vw - 640px) }
+#hint b { color: var(--ink); font-weight: 600 }
+/* Stacked above the hint rather than beside it: object ids run long, and a
+   readout that grows to the right eventually slides under a centred pill. */
 .hud {
-  position: absolute; left: 10px; bottom: 10px; background: #000a; padding: 6px 10px;
-  border-radius: 6px; font: 12px ui-monospace, monospace; color: #cfd4dd;
-  pointer-events: none; white-space: pre;
+  left: 288px; bottom: 46px; font: 11.5px/1.5 ui-monospace, monospace; white-space: pre;
+  border-radius: 8px; padding: 5px 10px; max-width: calc(100vw - 640px); overflow: hidden;
 }
-.bar {
-  position: absolute; left: 10px; top: 10px; background: #000a; padding: 6px 10px;
-  border-radius: 6px; font: 12px ui-monospace, monospace; color: #cfd4dd;
-  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; max-width: calc(100% - 20px);
-}
-.bar label { color: var(--dim) }
-.bar input[type=range] { width: 110px }
-#loading {
-  position: absolute; inset: 0; display: grid; place-items: center; color: var(--dim);
-  font: 13px ui-monospace, monospace; background: #0d0f12; text-align: center; padding: 20px;
-}
-#loading.error { color: #ff8f8f }
 
-#topdown {
-  width: 100%; aspect-ratio: 1; border-radius: 6px; border: 1px solid var(--line);
-  background: #0d0f12; display: block; cursor: crosshair;
+#helpcard { position: fixed; right: 16px; top: 60px; z-index: 8; width: 340px; display: none }
+#helpcard.show { display: block }
+#helpcard small { font-size: 12px }
+#helpcard .close {
+  position: absolute; top: 6px; right: 8px; border: 0; background: none; color: var(--muted);
+  font-size: 15px; padding: 2px 6px;
 }
-.kv {
-  display: grid; grid-template-columns: auto 1fr; gap: 3px 10px;
-  font: 12px ui-monospace, monospace; color: #cfd4dd; margin: 8px 0;
+
+@media (max-width: 760px) {
+  #panel { width: 200px }
+  /* The top-down view is a measuring instrument; a 170px one measures nothing,
+     and the cards that take verdicts are worth more than the space it wants. */
+  #inset { display: none }
+  #right { width: calc(100vw - 232px) }
+  .hud { left: 228px }
+  #hint { display: none }
 }
-.kv b { color: var(--dim); font-weight: 400 }
-small { color: var(--dim); display: block }
-.tag {
-  font: 11px ui-monospace, monospace; padding: 1px 6px; border-radius: 99px;
-  border: 1px solid var(--line); display: inline-block;
-}
-.stale { color: #ffc83d }

@@ -17,9 +17,10 @@ test('both languages exist and neither is empty', () => {
 
 test('no string was left untranslated by copy-paste', () => {
   // Identical text in both languages is almost always a forgotten translation.
-  // The few that are legitimately identical are listed, so adding another is a
-  // deliberate act rather than an oversight.
-  const allowed = new Set(['view.mode3d']);
+  // The few that are legitimately identical would be listed here, so adding one
+  // is a deliberate act rather than an oversight. There are none: "3D" went out
+  // with the mode bar it labelled.
+  const allowed = new Set();
   const same = Object.keys(STRINGS.en)
     .filter((k) => STRINGS.en[k] === STRINGS.zh[k] && !allowed.has(k));
   assert.deepEqual(same, [], 'same text in both languages');

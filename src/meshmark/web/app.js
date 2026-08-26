@@ -26,6 +26,38 @@ import { bounds, collectTriangles, renderTopDown, verifyMapping } from './topdow
 const $ = (id) => document.getElementById(id);
 const SPEC = await (await fetch('./spec.json')).json();
 
+/* ----------------------------------------------------------------- palette
+ *
+ * The stylesheet is where a colour is decided, including the colours drawn into
+ * the two canvases -- which CSS cannot reach on its own. Reading them back out
+ * of the computed style is the whole of the bridge: a hex literal here would be
+ * a second home for the same decision, and the two would agree right up until
+ * the theme changed under one of them.
+ *
+ * Read rather than cached at boot, because the theme can change while the page
+ * is open -- the OS switches at sunset and the canvases are the only part of
+ * the page that would not have noticed.
+ */
+const PALETTE_KEYS = ['floor', 'ink', 'muted', 'gt', 'est', 'bad', 'cam', 'marker'];
+// Seeded with a colour that belongs to no theme: a variable that fails to
+// resolve then draws visibly grey instead of handing "rgba(NaN…)" to a canvas.
+const PAL = Object.fromEntries(PALETTE_KEYS.map((k) => [k, '#808080']));
+
+function palette() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of PALETTE_KEYS) {
+    const v = cs.getPropertyValue(`--${k}`).trim();
+    if (v) PAL[k] = v;
+  }
+  return PAL;
+}
+
+/** The same colour, faded: how everything that is not the current object draws. */
+function fade(colour, a) {
+  const n = parseInt(String(colour).replace('#', ''), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
 /* ---------------------------------------------------------------- language */
 
 let lang = localStorage.getItem(`${store.PREFIX}:lang`) || SPEC.lang || 'en';
@@ -42,6 +74,12 @@ function applyStaticStrings() {
     el.innerHTML = t(el.dataset.i18nHtml);
   }
   $('langbtn').textContent = t('lang.other');
+  // Glyphs rather than words: there is nothing in them to translate, and text
+  // written into the markup is text no language switch can reach.
+  $('helpbtn').textContent = '?';
+  $('helpbtn').title = t('help.title');
+  $('helpclose').textContent = '×';
+  $('helpclose').setAttribute('aria-label', t('help.title'));
   $('note').placeholder = t('obj.note');
 }
 
@@ -158,7 +196,7 @@ renderer.localClippingEnabled = true;
 view.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0d0f12);
+scene.background = new THREE.Color(palette().floor);
 // Up axis is taken from the mesh, not imposed: the top-down view and the annotations
 // are in the mesh's own frame, and rotating it here would put every exported
 // coordinate in a frame nothing downstream knows about.
@@ -283,10 +321,14 @@ const routeColour = (i) => ROUTE_COLOURS[i % ROUTE_COLOURS.length];
 
 function rebuildOverlay() {
   overlay.clear();
+  // Read once per rebuild rather than held in a material: these are rebuilt on
+  // every edit anyway, so a theme change is picked up by the next redraw with
+  // nothing to invalidate.
+  const pal = palette();
   for (const r of SPEC.markers || []) {
     const m = new THREE.Mesh(
       new THREE.ConeGeometry(0.16, 0.5, 4),
-      new THREE.MeshBasicMaterial({ color: 0xff7ad0, transparent: true, opacity: 0.8 })
+      new THREE.MeshBasicMaterial({ color: pal.marker, transparent: true, opacity: 0.8 })
     );
     m.rotation.x = Math.PI;
     m.position.set(r.xy[0], r.xy[1], floorZ + 0.28);
@@ -332,7 +374,7 @@ function rebuildOverlay() {
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(o.radius_m, isCur ? 0.012 : 0.006, 8, 64),
         new THREE.MeshBasicMaterial({
-          color: 0xff5555, transparent: true, opacity: isCur ? 1 : 0.35,
+          color: pal.bad, transparent: true, opacity: isCur ? 1 : 0.35,
         })
       );
       ring.position.set(gx, gy, floorZ + 0.012);
@@ -342,7 +384,7 @@ function rebuildOverlay() {
           new THREE.BufferGeometry().setFromPoints([
             new THREE.Vector3(gx, gy, floorZ), new THREE.Vector3(gx, gy, floorZ + 1.2),
           ]),
-          new THREE.LineBasicMaterial({ color: 0xff5555 })
+          new THREE.LineBasicMaterial({ color: pal.bad })
         ));
       }
     }
@@ -350,7 +392,7 @@ function rebuildOverlay() {
       const edges = new THREE.LineSegments(
         new THREE.EdgesGeometry(new THREE.BoxGeometry(a.w, a.d, a.h || 0.9)),
         new THREE.LineBasicMaterial({
-          color: 0xffc83d, transparent: true, opacity: isCur ? 1 : 0.3,
+          color: pal.est, transparent: true, opacity: isCur ? 1 : 0.3,
         })
       );
       edges.position.set(a.xy[0], a.xy[1], floorZ + (a.h || 0.9) / 2);
@@ -394,6 +436,11 @@ function handleTexture(colour, path, hole = 0) {
   // Outline first and wider, so it reads as a rim rather than covering the fill.
   // Without it a white dot on a white wall is invisible in exactly the scans
   // where placing a box is already hardest.
+  //
+  // The one colour on the page that does not follow the theme, and deliberately:
+  // a grip is drawn over the mesh, never over the page, and what it has to stand
+  // out against is whatever the scan happens to be -- which is not lighter in a
+  // light theme.
   g.lineWidth = 7;
   g.strokeStyle = '#0d0f12';
   g.stroke();
@@ -774,8 +821,9 @@ function planFocus() {
 }
 
 function drawPlan() {
+  const pal = palette();
   pctx.setTransform(1, 0, 0, 1, 0, 0);
-  pctx.fillStyle = '#0d0f12';
+  pctx.fillStyle = pal.floor;
   pctx.fillRect(0, 0, pc.width, pc.height);
   pctx.imageSmoothingEnabled = pv.s < 1;
   pctx.drawImage(topDown.canvas, pv.ox, pv.oy, topDown.pixels * pv.s, topDown.pixels * pv.s);
@@ -790,14 +838,14 @@ function drawPlan() {
       [gx, gy] = toScreen(...o.reference_xy);
       pctx.beginPath();
       pctx.arc(gx, gy, (o.radius_m / topDown.metresPerPixel) * pv.s, 0, 7);
-      pctx.strokeStyle = isCur ? '#ff5555' : 'rgba(255,85,85,.28)';
+      pctx.strokeStyle = isCur ? pal.bad : fade(pal.bad, 0.28);
       pctx.lineWidth = isCur ? 2 : 1;
       pctx.setLineDash(isCur ? [7, 5] : [3, 4]);
       pctx.stroke();
       pctx.setLineDash([]);
     }
     if (a && a.status === 'absent' && gx !== null) {
-      pctx.strokeStyle = isCur ? '#9aa3b2' : 'rgba(154,163,178,.4)';
+      pctx.strokeStyle = isCur ? pal.muted : fade(pal.muted, 0.4);
       pctx.lineWidth = 2;
       const k = 9;
       pctx.beginPath();
@@ -809,17 +857,17 @@ function drawPlan() {
       pctx.beginPath();
       pts.forEach((p, k) => (k ? pctx.lineTo(...p) : pctx.moveTo(...p)));
       pctx.closePath();
-      pctx.strokeStyle = isCur ? '#ffc83d' : 'rgba(255,200,61,.35)';
+      pctx.strokeStyle = isCur ? pal.est : fade(pal.est, 0.35);
       pctx.lineWidth = isCur ? 2 : 1;
       pctx.stroke();
       if (isCur) {
-        pctx.fillStyle = '#ffc83d';
+        pctx.fillStyle = pal.est;
         for (const p of pts) { pctx.beginPath(); pctx.arc(p[0], p[1], 4.5, 0, 7); pctx.fill(); }
         if (gx !== null) {
           const [cx, cy] = toScreen(...a.xy);
           pctx.beginPath();
           pctx.moveTo(gx, gy); pctx.lineTo(cx, cy);
-          pctx.strokeStyle = '#ffc83d88';
+          pctx.strokeStyle = fade(pal.est, 0.53);
           pctx.setLineDash([4, 4]);
           pctx.lineWidth = 1;
           pctx.stroke();
@@ -833,7 +881,7 @@ function drawPlan() {
     const [sx, sy] = toScreen(...r.xy);
     pctx.beginPath();
     pctx.arc(sx, sy, 6, 0, 7);
-    pctx.fillStyle = '#ff7ad0';
+    pctx.fillStyle = pal.marker;
     pctx.fill();
     pctx.font = '11px system-ui';
     pctx.fillText(r.name, sx + 9, sy + 4);
@@ -1155,9 +1203,11 @@ function redraw() {
   $('pathbtn').textContent = t(pathMode ? 'routes.mode.on' : 'routes.mode.off');
   $('pathbtn').className = pathMode ? 'primary' : '';
   $('refinfo').innerHTML = (SPEC.markers || []).length ? t('markers.legend') : '';
-  $('baseline').textContent = SPEC.targets.length
+  // What this page is a pass over, in one breath: which scene, against which
+  // baseline. An export is only readable next to both.
+  $('baseline').textContent = `${SPEC.scene} · ` + (SPEC.targets.length
     ? t('view.baseline', { baseline: SPEC.baseline })
-    : t('view.noTargets');
+    : t('view.noTargets'));
 }
 
 function renderRoutes() {
@@ -1183,6 +1233,15 @@ function escapeHtml(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
+/* One glyph per verdict.
+ *
+ * These were coloured dots, and a dot cannot say more than "something happened
+ * here": confirmed and corrected -- the two the pass exists to tell apart --
+ * were the same green, and absent was a grey nobody read as a decision. The
+ * glyph is the same in the row and in the counter above it, so the heading is
+ * legible without a legend. */
+const STATUS_ICON = { confirmed: '✅', corrected: '✏️', absent: '🗑', added: '➕' };
+
 function renderList() {
   const objs = OBJ();
   const vis = visible();
@@ -1195,10 +1254,12 @@ function renderList() {
     const changed = classOf(o) !== o.cls;
     const del = o.kind === 'added'
       ? `<span class="del" data-del="${i}" title="Del">&times;</span>` : '';
-    return `<div class="item ${i === cur ? 'sel' : ''}" data-i="${i}">
-      <span class="dot ${a.status || ''}"></span>
+    // Ruled absent strikes the row through but leaves it live: this is the only
+    // way back from that verdict.
+    return `<div class="item ${i === cur ? 'sel' : ''} ${a.status === 'absent' ? 'absent' : ''}" data-i="${i}">
+      <span class="icon">${STATUS_ICON[a.status] || '○'}</span>
       <span class="nm">${escapeHtml(o.object_id)}<br><small>${escapeHtml(clsLabel(classOf(o)))}${
-        changed ? ` <i style="color:var(--ann)">(${escapeHtml(t('obj.original', { label: clsLabel(o.cls) }))})</i>` : ''
+        changed ? ` <i style="color:var(--est)">(${escapeHtml(t('obj.original', { label: clsLabel(o.cls) }))})</i>` : ''
       }</small></span>${del}</div>`;
   }).join('') : `<small>${t('list.empty')}</small>`;
 
@@ -1208,9 +1269,18 @@ function renderList() {
   for (const el of document.querySelectorAll('.del')) {
     el.onclick = (e) => { e.stopPropagation(); removeObject(+el.dataset.del); };
   }
-  const done = targets.filter((o) => (ann[o.object_id] || {}).status).length;
+  // Counted by verdict, not just "done": a pass that ruled twenty objects absent
+  // and confirmed two is not the same pass as the other way round, and a single
+  // fraction said neither. Zero counts are left out rather than shown as zero.
+  const tally = {};
+  for (const o of targets) {
+    const s = (ann[o.object_id] || {}).status;
+    if (s) tally[s] = (tally[s] || 0) + 1;
+  }
+  const icons = ['confirmed', 'corrected', 'absent']
+    .filter((s) => tally[s]).map((s) => `${STATUS_ICON[s]}${tally[s]}`).join(' ');
   $('progress').textContent =
-    (targets.length ? t('list.progress', { done, total: targets.length }) : '')
+    (targets.length ? t('list.progress', { icons: icons || '—', total: targets.length }) : '')
     + (extra.length ? t('list.progressAdded', { n: extra.length }) : '');
 }
 
@@ -1225,6 +1295,12 @@ function fillClassSelect() {
 
 function renderRight() {
   const o = current();
+  // Where this object sits in the pass. Without it the two arrows are a step in
+  // the dark: "3/14" is the difference between working through a list and
+  // wandering around one.
+  const vis = visible();
+  const at = vis.indexOf(cur);
+  $('navpos').textContent = vis.length ? `${at < 0 ? '—' : at + 1}/${vis.length}` : '';
   if (!o) { $('title').textContent = ''; return; }
   const a = A() || {};
   $('title').textContent = o.object_id;
@@ -1248,6 +1324,18 @@ function renderRight() {
   $('w').value = a.xy ? a.w.toFixed(2) : '';
   $('d').value = a.xy ? a.d.toFixed(2) : '';
   $('h').value = a.xy ? (a.h || 0.9).toFixed(2) : '';
+  for (const [id, axis] of [['cx', 0], ['cy', 1]]) {
+    const el = $(id);
+    // Left alone while it is being typed into AND still agrees with the object:
+    // this runs on every input event, and re-rounding the value under the caret
+    // turns "1.5" into "1.500" and puts the cursor at the end of it. The moment
+    // the two disagree it is written anyway -- an undo landing while the field
+    // still has focus would otherwise leave a number on the screen that the
+    // object does not have, which is the one thing these fields cannot do.
+    const agrees = Math.abs(parseFloat(el.value) - (a.xy ? a.xy[axis] : NaN)) < 1e-3;
+    if (document.activeElement === el && agrees) continue;
+    el.value = a.xy ? a.xy[axis].toFixed(3) : '';
+  }
 
   const st = t(`status.${a.status || 'pending'}`);
   const off = (a.xy && o.reference_xy)
@@ -1418,6 +1506,14 @@ function importJson(ev) {
 /* ------------------------------------------------------------------- wiring */
 
 $('langbtn').onclick = () => setLanguage(lang === 'zh' ? 'en' : 'zh');
+
+/* The full reference is a card you open, not a column standing permanently
+   under the panel. It is read closely twice on the first day and never again,
+   and for the rest of the time the pill along the bottom is the whole of what
+   anybody needs on the screen. */
+const setHelp = (on) => $('helpcard').classList.toggle('show', on);
+$('helpbtn').onclick = () => setHelp(!$('helpcard').classList.contains('show'));
+$('helpclose').onclick = () => setHelp(false);
 $('addbtn').onclick = () => { toggleAdd(); redraw(); };
 $('pathbtn').onclick = () => { togglePath(); redraw(); };
 $('undobtn').onclick = undoWaypoint;
@@ -1463,9 +1559,33 @@ function beginEdit(el) {
   editGesture = el;
   pushUndo();
 }
-for (const id of ['w', 'd', 'h', 'yaw']) {
+for (const id of ['w', 'd', 'h', 'yaw', 'cx', 'cy']) {
   $(id).addEventListener('focus', () => { editGesture = null; });
   $(id).addEventListener('blur', () => { editGesture = null; });
+}
+
+/* A typed position, on the same terms as a dragged one: the same gesture undo,
+   the same millimetre rounding, the same redraw. Some positions are read off a
+   floor plan rather than found by eye, and until now the only way to enter one
+   was to drag until the readout agreed.
+ *
+ * Parsed rather than coerced. `+""` and `+"-"` are 0 and NaN, and a field that
+ * is empty or half-typed names no position at all -- coercing either would put
+ * the object on the origin between two keystrokes. */
+for (const id of ['cx', 'cy']) {
+  $(id).oninput = () => {
+    const a = A();
+    if (!a || !a.xy) return;
+    const x = parseFloat($('cx').value), y = parseFloat($('cy').value);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    beginEdit($(id));
+    a.xy = [mm(x), mm(y)];
+    touch(); redraw();
+  };
+  // The render pass skips a focused field, so whatever was left half-typed in
+  // it is put right when the caret leaves rather than staying on the screen as
+  // a number the object does not have.
+  $(id).addEventListener('blur', renderRight);
 }
 
 $('yaw').oninput = (e) => {
@@ -1514,6 +1634,7 @@ addEventListener('keydown', (e) => {
     a.xy = [a.xy[0] + n[0], a.xy[1] + n[1]];
     touch(); redraw();
   } else if (e.key === 'Enter') step(1);
+  else if (e.key === 'Escape') setHelp(false);
   else if (e.key === 'f' || e.key === 'F') { frame(); planFocus(); }
   else if (e.key === 'Delete' || e.key === 'Backspace') {
     // Bulk passes mis-click; undoing one has to be as cheap as making one.
@@ -1540,6 +1661,21 @@ const sizeWatcher = new ResizeObserver(() => { resize3d(); resizePlan(); });
 // the canvas itself cannot feed back.
 sizeWatcher.observe(view);
 sizeWatcher.observe(pc);
+
+/* The theme can change while the page is open -- the machine switches at
+   sunset, halfway through a pass. The stylesheet follows on its own; the two
+   canvases are painted in JavaScript and would otherwise hold last night's
+   colours until something else happened to redraw them. */
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  scene.background = new THREE.Color(palette().floor);
+  // The top-down view is a readback of a render, so the scene's background is
+  // baked into the image rather than painted under it. Repainting the canvas
+  // alone would leave last night's backdrop showing through every part of the
+  // room that is floor -- which is most of it. The whole readback is tens of
+  // milliseconds and this happens about twice a day.
+  buildTopDown();
+  redraw();
+});
 
 /* -------------------------------------------------------------------- boot */
 
@@ -1577,6 +1713,10 @@ window.__meshmark = {
   get cur() { return cur; },
   get lang() { return lang; },
   get focusCur() { return focusCur; },
+  // The colours the canvases are actually painting with, resolved from the
+  // stylesheet: what a theme check has to compare, and the only way to make one
+  // from outside the page.
+  get palette() { return { ...palette() }; },
   // The handles as the picker sees them, not as they are drawn: a click test
   // run from outside the page is the only way to check the grab radius without
   // a hand on a mouse.

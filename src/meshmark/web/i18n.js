@@ -37,7 +37,9 @@ export const STRINGS = {
     'list.refs': 'Reference',
     'list.added': 'Added',
     'list.empty': '(nothing in this group yet)',
-    'list.progress': 'Reference {done}/{total}',
+    // The icons are the same glyphs the rows carry, counted: what is left to do
+    // is the difference between them and the total, read without a legend.
+    'list.progress': '{icons} of {total}',
     'list.progressAdded': ' · added {n}',
     'io.export': 'Export JSON',
     'io.import': 'Load',
@@ -47,7 +49,7 @@ export const STRINGS = {
     'io.badJson': 'That is not valid JSON: {err}',
     'io.noCoords': 'Loaded {total} objects, but not one of them has a position — this is most likely an export that was never annotated.',
     'io.loaded': 'Loaded {n} annotations with positions.',
-    'view.mode3d': '3D',
+    'view.title': 'View',
     'view.cut': 'Cut above',
     'view.frame': 'Frame target (F)',
     'view.loading': 'Loading the mesh…',
@@ -62,6 +64,7 @@ export const STRINGS = {
     'obj.classChanged': 'Class changed: {from} → {to}',
     'obj.original': 'was {label}',
     'obj.declared': 'reference radius {r} m',
+    'obj.cx': 'Centre x', 'obj.cy': 'Centre y',
     'obj.w': 'W', 'obj.d': 'D', 'obj.h': 'H',
     'obj.yaw': 'Yaw',
     'obj.confirm': 'Reference is right',
@@ -81,6 +84,11 @@ export const STRINGS = {
     'read.offset': 'offset',
     'read.floor': 'floor',
     'help.title': 'Controls',
+    // The standing pill, not the reference card: the four gestures a pass is
+    // actually made of, in the space above the mesh that can hold one line.
+    'help.pill':
+      '<b>Click</b> the mesh to place · <b>drag</b> a handle to fit · '
+      + '<b>Enter</b> next · <b>Ctrl+Z</b> undo · <b>?</b> for the rest',
     'help.body':
       '<b>3D:</b> left drag = orbit · right drag = pan · wheel = zoom<br>' +
       '<b>Click a box</b> = work on that object, wherever it is in the list<br>' +
@@ -119,7 +127,7 @@ export const STRINGS = {
     'list.refs': '参考',
     'list.added': '新增',
     'list.empty': '（这一组还没有物体）',
-    'list.progress': '参考 {done}/{total}',
+    'list.progress': '{icons} / 共 {total}',
     'list.progressAdded': ' · 新增 {n}',
     'io.export': '导出 JSON',
     'io.import': '载入',
@@ -129,7 +137,7 @@ export const STRINGS = {
     'io.badJson': '这不是有效的 JSON：{err}',
     'io.noCoords': '载入了 {total} 个物体，但没有一个带坐标 —— 这多半是一份还没标注过的导出。',
     'io.loaded': '已载入 {n} 个带坐标的标注。',
-    'view.mode3d': '3D',
+    'view.title': '视图',
     'view.cut': '切顶',
     'view.frame': '回到目标 (F)',
     'view.loading': '载入网格中…',
@@ -144,6 +152,7 @@ export const STRINGS = {
     'obj.classChanged': '类别已改：{from} → {to}',
     'obj.original': '原为 {label}',
     'obj.declared': '参考半径 {r} m',
+    'obj.cx': '中心 x', 'obj.cy': '中心 y',
     'obj.w': '宽', 'obj.d': '深', 'obj.h': '高',
     'obj.yaw': '朝向',
     'obj.confirm': '参考位置正确',
@@ -163,6 +172,9 @@ export const STRINGS = {
     'read.offset': '偏移',
     'read.floor': '地面',
     'help.title': '操作',
+    'help.pill':
+      '<b>点</b>网格放置 · <b>拖</b>手柄调整 · '
+      + '<b>Enter</b> 下一个 · <b>Ctrl+Z</b> 撤销 · 其余看 <b>?</b>',
     'help.body':
       '<b>3D：</b>左键拖 = 旋转 · 右键拖 = 平移 · 滚轮 = 缩放<br>' +
       '<b>点一下框</b> = 切到那个物体，不用先在列表里找<br>' +
