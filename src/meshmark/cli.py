@@ -1,6 +1,7 @@
-"""Command line: build an annotator bundle from a mesh, and serve it.
+"""Command line: build an annotator bundle from a mesh, fit boxes, and serve it.
 
     meshmark build room.glb --out .annotate/room --classes operating-room
+    meshmark fit room.glb --targets gt.json --out proposals.json
     meshmark serve .annotate/room
 
 ``serve`` binds to 127.0.0.1 only. A bundle contains a copy of the scan it was
@@ -17,11 +18,12 @@ from pathlib import Path
 from . import __version__
 from .bundle import BundleError, build
 from .classes import PresetError
+from .fit import DEFAULT_Z_MAX_M, FitError, propose
 from .mesh import MeshError
 from .targets import TargetError
 from .vendor import VendorError
 
-ERRORS = (BundleError, PresetError, MeshError, TargetError, VendorError)
+ERRORS = (BundleError, FitError, PresetError, MeshError, TargetError, VendorError)
 
 
 def _build_parser(sub) -> None:
@@ -63,12 +65,51 @@ def _build_parser(sub) -> None:
                    help="symlink the mesh instead of copying it")
 
 
+def _fit_parser(sub) -> None:
+    p = sub.add_parser(
+        "fit",
+        help="propose a box for each reference position, for a person to review",
+        description=(
+            "Fit a box to the geometry around each position a targets file "
+            "claims, and write the result as an annotation file in which every "
+            "object is still pending.\n\n"
+            "fit does not discover objects. It fits a box to the geometry "
+            "around each position the targets file already claims -- an empty "
+            "targets file gets you nothing, and a position pointing at bare "
+            "floor comes back saying so. Every box it writes is a proposal: "
+            "open it with 'meshmark build --preload' and rule on each one."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("mesh", help=".glb, .gltf or .obj")
+    p.add_argument("--targets", required=True, metavar="FILE",
+                   help="the positions to fit around, as JSON. Required: there "
+                        "is nothing to fit without them")
+    p.add_argument("--out", required=True, metavar="FILE",
+                   help="annotation file to write the proposals into")
+    p.add_argument("--classes", default="generic", metavar="PRESET|FILE",
+                   help="class preset, used for its nominal sizes when deciding "
+                        "how wide a window to cut around each position "
+                        "(default: generic)")
+    p.add_argument("--name", dest="scene", metavar="NAME",
+                   help="name for this room (default: the mesh filename)")
+    p.add_argument("--floor", type=float, dest="floor_z_m", metavar="METRES",
+                   help="floor height in metres. Omit and it is measured from "
+                        "the mesh, the same way the annotator measures it")
+    p.add_argument("--z-max", type=float, default=DEFAULT_Z_MAX_M,
+                   dest="z_max_m", metavar="METRES",
+                   help=f"ignore geometry more than this far above the floor, so "
+                        f"a ceiling is never read as an object's top "
+                        f"(default: {DEFAULT_Z_MAX_M})")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="meshmark", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"meshmark {__version__}")
     sub = ap.add_subparsers(dest="cmd", required=True)
     _build_parser(sub)
+    _fit_parser(sub)
 
     s = sub.add_parser("serve", help="serve a bundle on localhost")
     s.add_argument("bundle")
@@ -79,6 +120,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.cmd == "build":
             return _run_build(args)
+        if args.cmd == "fit":
+            return _run_fit(args)
         return _run_serve(args)
     except ERRORS as exc:
         print(f"meshmark: {exc}", file=sys.stderr)
@@ -100,6 +143,32 @@ def _run_build(args) -> int:
         + (f" · baseline {info['baseline']}" if info["targets"] else "")
         + f"\n  mesh {info['mesh_mb']:.1f} MB · three {info['three']}\n"
         f"  meshmark serve {info['out']}"
+    )
+    return 0
+
+
+def _run_fit(args) -> int:
+    info = propose(
+        mesh=args.mesh, targets=args.targets, out=args.out,
+        classes=args.classes, scene=args.scene,
+        floor_z_m=args.floor_z_m, z_max_m=args.z_max_m,
+    )
+    for r in info["results"]:
+        box = r["box"]
+        shape = (f"{box['width_m']:.2f} x {box['depth_m']:.2f} @ {box['yaw_deg']:>5.1f}° "
+                 f"h {box['height_m']:.2f}  {r['confidence']:<6} {r['points_used']:>6} pts"
+                 if box else "-- nothing to fit here")
+        flag = " *" if r["needs_manual"] else ""
+        print(f"  {r['object_id']:<28} {shape}{flag}")
+    print(
+        f"\n{info['proposals']} proposals written to {info['out']}"
+        + (f", {info['empty']} position(s) with nothing to fit" if info["empty"] else "")
+        + (f"\n  {info['flagged']} flagged for hand review (*)" if info["flagged"] else "")
+        + "\n  every one is pending until a person rules on it -- "
+          "fit proposes, you annotate\n"
+        f"  floor {info['floor_z_m']:.3f} m\n"
+        f"  meshmark build {args.mesh} --targets {args.targets} "
+        f"--out .annotate/{info['scene']} --preload {info['out']}"
     )
     return 0
 

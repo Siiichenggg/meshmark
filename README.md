@@ -94,16 +94,18 @@ a robot's start pose, a doorway, anything a route should be judged against.
 
 ## What it does not do
 
-- **It does not segment anything.** It is a manual annotator by design. A
+- **It does not find objects.** It is a manual annotator by design. A
   photogrammetry scan is usually one welded surface over the whole room, and no
-  clustering method separates a cart from the wall behind it.
-- **It does not measure height for you.** Width, depth and yaw are dragged onto
+  clustering method separates a cart from the wall behind it. `meshmark fit`
+  fits a box around a position you already have; it never discovers one.
+- **It does not decide anything for you.** Width, depth and yaw are dragged onto
   the object, and height can be too — the diamond on top of the box runs up a
-  vertical rail until the box reaches the top of what it encloses. But nothing
-  does this on its own: a height nobody has touched is the class default, which
-  is a guess. `height_source` in the export says which of the three each height
-  is, because a figure measured against the mesh and a figure nobody looked at
-  should not be cited the same way.
+  vertical rail until the box reaches the top of what it encloses. `meshmark
+  fit` will read all four off the mesh, but what it writes is a *proposal*: it
+  arrives pending, in the review queue, with nothing marked handled.
+  `height_source` in the export says which of the four ways each height got its
+  number, because a figure dragged onto the mesh, a figure a program fitted and
+  a figure nobody has ever looked at should not be cited the same way.
 - **One room, one person, one browser.** No server, no accounts, no merging.
 
 ## Install
@@ -131,6 +133,14 @@ meshmark build or_room.glb --out .annotate/or_room \
     --marker "robot start=-1.35,-1.9"
 
 meshmark serve .annotate/or_room --open
+
+# propose a box around each of those positions first, and open the annotator
+# on the proposals instead of on empty rings
+meshmark fit or_room.glb --targets gt_or_room.json \
+    --classes operating-room \
+    --out proposals.json
+meshmark build or_room.glb --out .annotate/or_room \
+    --targets gt_or_room.json --preload proposals.json
 ```
 
 ### `meshmark build`
@@ -149,6 +159,34 @@ meshmark serve .annotate/or_room --open
 | `--preload` | — | An exported file to open with, when the browser has no saved work |
 | `--three` | *searched* | Path to a three.js package directory |
 | `--link` | off | Symlink the mesh instead of copying it. For large scans |
+
+### `meshmark fit`
+
+Fits a box to the geometry around each position in a targets file and writes
+them as an annotation file you hand to `--preload`. **It proposes; you
+annotate.** Every object it writes arrives *pending*, with no status on it, so
+all of them appear in the review queue unhandled — a box that turns up already
+marked confirmed is a box nobody opens.
+
+It does not find objects. A position pointing at bare floor comes back with a
+sentence saying so and no box at all, and an empty targets file gets you
+nothing. Fits it doubts — a rim rather than a body, a height that is a bound
+rather than a reading, a shape a long way off what the class preset expects —
+are flagged in the file and counted in the summary.
+
+| Option | Default | What it does |
+|---|---|---|
+| `--targets` | *required* | The positions to fit around. Without them there is nothing to fit |
+| `--out` | *required* | Annotation file to write the proposals into |
+| `--classes` | `generic` | Preset whose nominal sizes size the window cut around each position |
+| `--name` | mesh filename | Name for this room, written into the file |
+| `--floor` | *detected* | Floor height in metres, measured from the mesh if omitted |
+| `--z-max` | `2.5` | Ignore geometry more than this far above the floor, so a ceiling is never read as an object's top |
+
+The file also carries a `fit` section the annotator ignores: every threshold the
+run used, and per object which rules fired, how confident the height is, and how
+many points it was fitted from. A proposal outlives the command line that made
+it.
 
 ### `meshmark serve`
 
@@ -330,7 +368,7 @@ The JavaScript is in `.js` files, not embedded in Python strings, so it can be
 parsed, linted and unit-tested. `tests/js/` covers the parts with no DOM in them:
 floor detection, box geometry, the storage layer and the translation tables.
 
-Early days — 0.2.0. The formats above carry a version number, so a breaking
+Early days — 0.3.0. The formats above carry a version number, so a breaking
 change will announce itself.
 
 ## Licence
