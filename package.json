@@ -1,6 +1,6 @@
 {
   "name": "meshmark",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Dev dependency holder and JavaScript test runner for meshmark. The tool itself is the Python package; three.js is copied into each bundle it builds.",
   "type": "module",

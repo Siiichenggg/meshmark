@@ -368,7 +368,7 @@ The JavaScript is in `.js` files, not embedded in Python strings, so it can be
 parsed, linted and unit-tested. `tests/js/` covers the parts with no DOM in them:
 floor detection, box geometry, the storage layer and the translation tables.
 
-Early days — 0.3.0. The formats above carry a version number, so a breaking
+Early days — 0.3.1. The formats above carry a version number, so a breaking
 change will announce itself.
 
 ## Licence

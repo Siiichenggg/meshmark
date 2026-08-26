@@ -204,9 +204,6 @@ const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 500);
 camera.up.set(0, 0, 1);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-const ambient = new THREE.AmbientLight(0xffffff, 1.0);
-scene.add(ambient);
-
 const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
 const overlay = new THREE.Group();
 let roomMeshes = [];
@@ -241,11 +238,6 @@ try {
 room.traverse((o) => {
   if (!o.isMesh) return;
   roomMeshes.push(o);
-  for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
-    if (!m) continue;
-    m.clippingPlanes = [clipPlane];
-    m.side = THREE.DoubleSide;
-  }
 });
 if (!roomMeshes.length) {
   $('loading').className = 'error';
@@ -259,6 +251,15 @@ if (!roomMeshes.length) {
  * a lamp to it double-lights the room: shading laid over shading that is already
  * there. Flat ambient is right for that, and was the only mode this had.
  *
+ * A scan wants its texture on screen unchanged, and the way to ask for that is a
+ * material that does no lighting at all. The lit materials the loaders hand back
+ * -- Phong from MTLLoader, Standard from glTF -- came out equal to the texture
+ * under white ambient only in three's legacy lighting mode, and r155 removed it;
+ * since then the same arrangement lifts the whole image toward grey and the scan
+ * loses its contrast. MeshBasicMaterial is the texture by construction, under any
+ * lights, so a mesh that carries its own lighting is rebuilt onto one rather than
+ * left to a lamp arrangement that happens to cancel.
+ *
  * An untextured mesh has no lighting at all, and under flat ambient every face
  * of every object returns exactly its base colour -- a silhouette with no edges,
  * in the one view whose entire job is letting a person identify what they are
@@ -266,8 +267,35 @@ if (!roomMeshes.length) {
 const litAlready = roomMeshes.some((m) =>
   (Array.isArray(m.material) ? m.material : [m.material])
     .some((x) => x && (x.map || x.vertexColors || x.emissiveMap || x.aoMap)));
+// One replacement per source material, not per mesh: a loaded scan shares its
+// materials across meshes, and a second pass over one would dispose it twice.
+const unlit = new Map();
+const flatten = (m) => {
+  if (unlit.has(m)) return unlit.get(m);
+  const flat = new THREE.MeshBasicMaterial({
+    map: m.map || null,
+    color: m.color ? m.color.clone() : new THREE.Color(0xffffff),
+    vertexColors: !!m.vertexColors,
+  });
+  unlit.set(m, flat);
+  // The material goes; the texture stays, because flat.map is now the one
+  // holding it.
+  m.dispose();
+  return flat;
+};
+for (const o of roomMeshes) {
+  const many = Array.isArray(o.material);
+  const mats = (many ? o.material : [o.material])
+    .map((m) => (m && litAlready ? flatten(m) : m));
+  for (const m of mats) {
+    if (!m) continue;
+    m.clippingPlanes = [clipPlane];
+    m.side = THREE.DoubleSide;
+  }
+  if (litAlready) o.material = many ? mats : mats[0];
+}
 if (!litAlready) {
-  ambient.intensity = 0.55;
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
   const sky = new THREE.HemisphereLight(0xdfe8ff, 0x2b3038, 1.1);
   scene.add(sky);
   const key = new THREE.DirectionalLight(0xffffff, 1.25);
