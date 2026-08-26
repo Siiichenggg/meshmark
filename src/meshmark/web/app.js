@@ -686,8 +686,10 @@ function dragHandle(e) {
     if (t === null) return;
     a.h = Math.min(G.HANDLE.HEIGHT_MAX_M, Math.max(G.HANDLE.HEIGHT_MIN_M, cm(t)));
     // Where a height came from is exported, and a dragged one is neither the
-    // class default nor a typed measurement.
+    // class default nor a typed measurement. A hand on the rail also ends
+    // whatever the fitter claimed about this number: it is the reviewer's now.
     a.hDragged = true;
+    delete a.hFitted;
   } else {
     const p = G.rayPlaneZ(origin, dir, floorZ);
     if (!p) return;
@@ -1057,6 +1059,10 @@ function setClass(clsId) {
     if (a.xy && Math.abs(a.w - oldSize[0]) < 1e-6 && Math.abs(a.d - oldSize[1]) < 1e-6
         && Math.abs((a.h || 0) - oldSize[2]) < 1e-6) {
       [a.w, a.d, a.h] = newSize;
+      // This writes a new height, so it ends any claim about where the old one
+      // came from: what stands there now is the new class's guess.
+      delete a.hDragged;
+      delete a.hFitted;
     }
     const id = mintId(clsId, o.object_id);
     if (id !== o.object_id) {
@@ -1099,6 +1105,37 @@ function setStatus(s) {
   // Reaching for "next" after every single judgement is the whole cost of a
   // hundred-object round, and it is paid one click at a time.
   if (s === 'confirmed' || s === 'absent') stepUntouched();
+  redraw();
+}
+
+/* The box on the screen is right as it stands: rule on it and move on.
+ *
+ * The other verdict button means "the reference was right", and says so by
+ * putting the box back on the reference's own coordinates. That is the wrong
+ * button for a box that arrived already fitted -- reviewing a proposal, the
+ * common answer is that the fit is good, and the one thing that must not happen
+ * when someone says so is the box moving. So this one writes nothing but the
+ * verdict: the same verdict placing it by hand would have earned, which is
+ * whether it ended up where the reference said.
+ */
+function acceptAsDrawn() {
+  const o = current();
+  if (!o) return;
+  const a = A();
+  // Nothing drawn is nothing to accept -- and, like confirming without a
+  // reference, doing nothing must leave no undo entry behind to swallow the
+  // next Ctrl+Z.
+  if (!a || !a.xy) return;
+  pushUndo();
+  a.status = o.reference_xy
+    ? (Math.hypot(a.xy[0] - o.reference_xy[0], a.xy[1] - o.reference_xy[1]) < 0.02
+      ? 'confirmed' : 'corrected')
+    // With no reference there is nothing to agree or disagree with, so the
+    // verdict is the one an added object already carries. The button is then
+    // just the step forward, which is what accepting an unremarkable box is.
+    : (a.status || 'added');
+  touch();
+  stepUntouched();
   redraw();
 }
 
@@ -1301,8 +1338,11 @@ function renderRight() {
   const vis = visible();
   const at = vis.indexOf(cur);
   $('navpos').textContent = vis.length ? `${at < 0 ? '—' : at + 1}/${vis.length}` : '';
-  if (!o) { $('title').textContent = ''; return; }
   const a = A() || {};
+  // Accepting the box takes a box. Set before the empty-list return below, or
+  // the button keeps the state it had for whatever was selected last.
+  $('acceptbtn').disabled = !a.xy;
+  if (!o) { $('title').textContent = ''; return; }
   $('title').textContent = o.object_id;
   $('lbl').innerHTML = `<small>${
     o.radius_m ? escapeHtml(t('obj.declared', { r: o.radius_m })) : ''
@@ -1398,15 +1438,22 @@ function buildExport() {
           depth_m: +a.d.toFixed(3),
           height_m: +(a.h || nominal).toFixed(3),
           yaw_deg: a.yaw || 0,
-          // Three ways a height gets its number, and they are not equally good.
+          // Four ways a height gets its number, and they are not equally good.
           // Dragged against the mesh on the vertical rail is a measurement of
-          // the object; typed is a measurement of something, made elsewhere;
-          // the class default is a guess that has never been looked at. Saying
-          // which is the difference between a figure and a figure that gets
-          // cited as one.
+          // the object; fitted from the mesh is the same measurement made by
+          // the fitter and left alone by the reviewer; typed is a measurement
+          // of something, made elsewhere; the class default is a guess that has
+          // never been looked at. Saying which is the difference between a
+          // figure and a figure that gets cited as one.
+          //
+          // The two marks are how the first two are told from the last two, and
+          // both are cleared by whatever edits the number they vouch for -- so
+          // a mark that is still here is itself the evidence that nobody has.
           height_source: a.hDragged
             ? 'dragged in 3D'
-            : (Math.abs((a.h || nominal) - nominal) < 1e-6 ? 'class default' : 'entered by hand'),
+            : a.hFitted
+              ? 'fitted from the mesh'
+              : (Math.abs((a.h || nominal) - nominal) < 1e-6 ? 'class default' : 'entered by hand'),
         };
         if (o.reference_xy) {
           out.offset_m = +Math.hypot(
@@ -1456,8 +1503,17 @@ function applyRound(d) {
         extra: o.source_fields || {},
       });
     }
-    if (o.status === 'pending' && !o.world_xy && !o.note && !o.original_class_id) continue;
-    const a = { status: o.status, note: o.note || '' };
+    /* "pending" is how an export words the absence of a verdict; it is not one
+       of the verdicts this page can hold. Read back as a status it became one:
+       everything that asks "has anybody ruled on this?" -- the untouched step,
+       the progress tally, the ○ in the list -- tests whether a status is there
+       at all, so an unfinished round exported and loaded again came back
+       looking finished. A proposal file, which carries no status on purpose,
+       must arrive the same way: untouched. */
+    const status = o.status && o.status !== 'pending' ? o.status : null;
+    if (!status && !o.world_xy && !o.note && !o.original_class_id) continue;
+    const a = { note: o.note || '' };
+    if (status) a.status = status;
     const base = known.has(o.object_id)
       ? targets.find((x) => x.object_id === o.object_id).cls : clsId;
     if (clsId !== base) a.cls = clsId;
@@ -1469,8 +1525,12 @@ function applyRound(d) {
       a.h = b.height_m ?? 0.9;
       a.yaw = b.yaw_deg ?? 0;
       // Carried back in, or a round trip through a file turns a height somebody
-      // measured against the mesh into one the export calls typed.
+      // measured against the mesh into one the export calls typed. A fitted
+      // height is the same claim made by a machine rather than a hand, and it
+      // survives the trip on the same terms: the mark stays only as long as
+      // nobody edits the number under it.
       if (b.height_source === 'dragged in 3D') a.hDragged = true;
+      else if (b.height_source === 'fitted from the mesh') a.hFitted = true;
     }
     ann[o.object_id] = a;
   }
@@ -1534,6 +1594,7 @@ $('imp').onchange = importJson;
 $('resetbtn').onclick = resetAll;
 $('framebtn').onclick = () => { frame(); planFocus(); };
 $('relabel').onchange = (e) => setClass(e.target.value);
+$('acceptbtn').onclick = acceptAsDrawn;
 $('confirmbtn').onclick = () => setStatus('confirmed');
 $('absentbtn').onclick = () => setStatus('absent');
 $('clearbtn').onclick = () => {
@@ -1600,9 +1661,9 @@ for (const id of ['w', 'd', 'h']) {
     a.w = Math.max(G.BOX.MIN_SIDE_M, +$('w').value || a.w);
     a.d = Math.max(G.BOX.MIN_SIDE_M, +$('d').value || a.d);
     a.h = Math.max(G.BOX.MIN_SIDE_M, +$('h').value || a.h || 0.9);
-    // A typed height is a different claim from a dragged one, and the export
-    // says which: retyping the number has to take the mark off.
-    if (id === 'h') delete a.hDragged;
+    // A typed height is a different claim from a dragged or a fitted one, and
+    // the export says which: retyping the number has to take both marks off.
+    if (id === 'h') { delete a.hDragged; delete a.hFitted; }
     touch(); redraw();
   };
 }
@@ -1722,7 +1783,8 @@ window.__meshmark = {
   // a hand on a mouse.
   get handles() { return handles.map(({ kind, i, at }) => ({ kind, i, at })); },
   mapping,
-  place, step, setStatus, setClass, setLanguage, buildExport, applyRound, redraw, undo,
+  place, step, setStatus, acceptAsDrawn, setClass, setLanguage, buildExport, applyRound,
+  redraw, undo,
   // What the ResizeObserver calls. Exposed because the observer is delivered on
   // the event loop's rendering steps, which a hidden page does not run -- so in
   // a headless or background tab the sizing path cannot be triggered from
