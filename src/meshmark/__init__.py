@@ -6,6 +6,6 @@ enough -- from directly above, a trash can and a stack of folded linen are the
 same grey circle.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = ["__version__"]

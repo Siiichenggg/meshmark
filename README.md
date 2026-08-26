@@ -53,8 +53,14 @@ The **3D view** is where you identify. From directly above, a trash can and a
 stack of folded linen are the same grey circle; you have to look from the side to
 tell them apart.
 
-Both edit the same annotation: click the mesh in 3D to place a box, then nudge it
-on the top-down view with the arrow keys at 1 cm per press.
+Both edit the same annotation. A click on the mesh in 3D puts the box down; from
+then on it is edited where it stands, by the grips on the box itself — the centre
+moves it, the corners resize it, the ring outside one edge turns it, and the
+diamond on top pulls its height up the vertical rail. A click on bare mesh only
+ever places a box that has nowhere to be yet, so a stray click on the far wall
+cannot teleport one you have already fitted. The top-down view is where the last
+centimetre gets measured: drag it there, or nudge with the arrow keys at 1 cm per
+press.
 
 Both views hide everything above **the cut**, a height above the floor set by
 `--cut-height` and adjustable with the slider. Without it you would be looking at
@@ -77,6 +83,11 @@ For every object you then record one of:
 Objects you add have no ring and no reference position. Objects from the file
 keep theirs, so a diff against the original is always available.
 
+Recording `confirmed` or `absent` is the end of one object's turn, so it moves
+you on to the next object nobody has ruled on yet, wrapping once and staying put
+when there is none. A hundred-object pass otherwise costs a hundred extra clicks
+on *next*.
+
 **`--targets` and `--marker` are different things.** `--targets` are positions you
 check and edit. A `--marker` is a fixed point drawn in pink that you cannot edit —
 a robot's start pose, a doorway, anything a route should be judged against.
@@ -86,9 +97,13 @@ a robot's start pose, a doorway, anything a route should be judged against.
 - **It does not segment anything.** It is a manual annotator by design. A
   photogrammetry scan is usually one welded surface over the whole room, and no
   clustering method separates a cart from the wall behind it.
-- **It does not measure height.** You drag width, depth and yaw onto the object;
-  height starts at the class default and stays there unless you type one. The
-  export marks which of the two each height is, in `height_source`.
+- **It does not measure height for you.** Width, depth and yaw are dragged onto
+  the object, and height can be too — the diamond on top of the box runs up a
+  vertical rail until the box reaches the top of what it encloses. But nothing
+  does this on its own: a height nobody has touched is the class default, which
+  is a guess. `height_source` in the export says which of the three each height
+  is, because a figure measured against the mesh and a figure nobody looked at
+  should not be cited the same way.
 - **One room, one person, one browser.** No server, no accounts, no merging.
 
 ## Install
@@ -156,9 +171,14 @@ Any other extension stops the build with a suggested conversion.
 
 | | |
 |---|---|
-| **3D** | left drag orbit · right drag pan · wheel zoom · **single click** places the box |
+| **3D** | left drag orbit · right drag pan · wheel zoom · click a box selects it · its grips: centre moves · corners resize · ring turns · diamond sets height · click on bare mesh places a target that has no position yet |
 | **Top-down** | click sets the centre · drag inside moves · drag a corner resizes |
-| **Keys** | arrows nudge 1 cm (Shift 10 cm) · <kbd>Enter</kbd> next · <kbd>F</kbd> frame · <kbd>Del</kbd> remove |
+| **Keys** | arrows nudge 1 cm (Shift 10 cm) · <kbd>Enter</kbd> next · <kbd>F</kbd> frame · <kbd>Del</kbd> remove · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo |
+
+**focus current**, above the object list, draws and hit-tests the object you are
+on and nothing else. A room's worth of boxes overlaps from every angle a person
+can stand at, and the one being edited is the one that has to stay legible. It is
+remembered per browser, not per room.
 
 Your work is saved to the browser's `localStorage` as you go. It is stored under
 the room name plus a digest of the reference positions, so editing that file
@@ -212,7 +232,7 @@ Routes are stored under the room name alone, and survive a rebuild.
 | `reference_xy` | where the file said it was. Absent on added objects |
 | `offset_m` | distance between those two |
 | `box.yaw_deg` | rotation about the vertical axis, degrees |
-| `box.height_source` | `class default` or `entered by hand` |
+| `box.height_source` | `class default`, `entered by hand`, or `dragged in 3D` against the mesh |
 | `source_fields` | anything in your `--targets` file meshmark does not model, handed back untouched |
 
 Coordinates are in the mesh's own frame. Nothing is converted on the way in or
@@ -310,7 +330,7 @@ The JavaScript is in `.js` files, not embedded in Python strings, so it can be
 parsed, linted and unit-tested. `tests/js/` covers the parts with no DOM in them:
 floor detection, box geometry, the storage layer and the translation tables.
 
-Early days — 0.1.0. The formats above carry a version number, so a breaking
+Early days — 0.2.0. The formats above carry a version number, so a breaking
 change will announce itself.
 
 ## Licence
