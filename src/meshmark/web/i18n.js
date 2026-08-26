@@ -32,6 +32,7 @@ export const STRINGS = {
     'markers.legend': '<span class="swatch ref"></span> pink = a marker: drawn, never editable',
     'list.title': 'Objects',
     'list.showRefs': 'show references',
+    'list.focusCur': 'focus current',
     'list.all': 'All',
     'list.refs': 'Reference',
     'list.added': 'Added',
@@ -82,9 +83,13 @@ export const STRINGS = {
     'help.title': 'Controls',
     'help.body':
       '<b>3D:</b> left drag = orbit · right drag = pan · wheel = zoom<br>' +
-      '<b>single click</b> on the mesh = put the target there<br>' +
+      '<b>Click a box</b> = work on that object, wherever it is in the list<br>' +
+      '<b>Its handles:</b> centre = move · corner = resize · ring beyond the edge = turn · ' +
+      'diamond on top = height<br>' +
+      '<b>Single click on bare mesh</b> = put the target there, only while it has no position yet; ' +
+      'an object already placed is moved by its centre handle, the top-down view or the arrow keys<br>' +
       '<b>Top-down:</b> click = set centre · drag inside = move · drag a corner = resize<br>' +
-      '<b>Arrow keys</b> = 1 cm (Shift = 10 cm) · <b>Enter</b> = next<br>' +
+      '<b>Arrow keys</b> = 1 cm (Shift = 10 cm) · <b>Enter</b> = next · <b>Ctrl+Z</b> = undo the last edit<br>' +
       '<b>Del</b> = delete the current added object (reference targets cannot be deleted, only marked absent)',
   },
   zh: {
@@ -109,6 +114,7 @@ export const STRINGS = {
     'markers.legend': '<span class="swatch ref"></span> 粉色 = 标记：只画出来，不可编辑',
     'list.title': '物体列表',
     'list.showRefs': '显示参考',
+    'list.focusCur': '只看当前',
     'list.all': '全部',
     'list.refs': '参考',
     'list.added': '新增',
@@ -159,9 +165,12 @@ export const STRINGS = {
     'help.title': '操作',
     'help.body':
       '<b>3D：</b>左键拖 = 旋转 · 右键拖 = 平移 · 滚轮 = 缩放<br>' +
-      '在网格上<b>单击</b> = 把目标放到那里<br>' +
+      '<b>点一下框</b> = 切到那个物体，不用先在列表里找<br>' +
+      '<b>框上的手柄：</b>中心 = 移动 · 角点 = 改尺寸 · 边外圆点 = 转朝向 · 顶部菱形 = 调高<br>' +
+      '在<b>裸网格上单击</b> = 把目标放到那里，仅限当前物体还没有位置时；' +
+      '已经放好的物体只能用中心手柄、俯视图或方向键移动<br>' +
       '<b>俯视：</b>单击 = 设中心 · 框内拖 = 移动 · 角点拖 = 改尺寸<br>' +
-      '<b>方向键</b> = 1 cm（Shift = 10 cm）· <b>Enter</b> = 下一个<br>' +
+      '<b>方向键</b> = 1 cm（Shift = 10 cm）· <b>Enter</b> = 下一个 · <b>Ctrl+Z</b> = 撤销上一步编辑<br>' +
       '<b>Del</b> = 删除当前新增物体（参考目标删不掉，只能标「此处无物」）',
   },
 };

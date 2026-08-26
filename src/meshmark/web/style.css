@@ -41,6 +41,9 @@ h2 .inline {
   margin-left: auto; font-size: 11px; text-transform: none; letter-spacing: 0;
   display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
 }
+/* Only the first of a run gets pushed to the right; the rest follow it, so two
+   view switches read as one group instead of one per line. */
+h2 .inline + .inline { margin-left: 8px }
 .soft { color: var(--dim); font-weight: 400 }
 .mono { font: 13px/1.4 ui-monospace, monospace; word-break: break-all }
 

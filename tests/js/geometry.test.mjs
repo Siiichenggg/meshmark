@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   floorPlane, corners, toLocal, resizeFromCorner, pathLength, topDownMapping,
+  rayBox, pickBox, rayPlaneZ, axisHeight, normYaw180, PICK, HANDLE,
 } from '../../src/meshmark/web/geometry.js';
 
 /** A slab of horizontal triangles at height z, plus optional vertical walls. */
@@ -131,6 +132,148 @@ test('dragging through the pin flips the box instead of collapsing it', () => {
   const area = ([w, d]) => w * d;
   assert.ok(area(sizes.at(-1)) > area(sizes[0]),
     `dragging past the pin and onward must grow the box, got ${JSON.stringify(sizes)}`);
+});
+
+/* ------------------------------------------------------- clicking in 3D */
+
+/** A unit box on a floor at z = 0, centred on the origin. */
+const unit = { xy: [0, 0], w: 1, d: 1, h: 1, yaw: 0 };
+
+test('a ray down the middle enters the box at its padded face', () => {
+  // Aimed along +Y from five metres out, at half height. The near face is at
+  // y = -0.5, and the pad moves the surface the click may land on to -0.56.
+  const t = rayBox(unit, [0, -5, 0.5], [0, 1, 0], 0);
+  assert.ok(Math.abs(t - (5 - 0.5 - PICK.PAD_M)) < 1e-9, `entered at ${t}`);
+});
+
+test('a ray that goes past the box misses it', () => {
+  assert.equal(rayBox(unit, [3, -5, 0.5], [0, 1, 0], 0), null);
+  // Over the top, too: the volume ends at the box height plus the pad.
+  assert.equal(rayBox(unit, [0, -5, 1.5], [0, 1, 0], 0), null);
+});
+
+test('the pad is what makes a wireframe box clickable', () => {
+  // 3 cm outside the drawn side: a miss on the geometry, a hit on the thing a
+  // person was aiming at.
+  const at = (x) => rayBox(unit, [x, -5, 0.5], [0, 1, 0], 0);
+  assert.equal(at(0.53) !== null, true, 'a click just outside the face must select it');
+  assert.equal(at(0.5 + PICK.PAD_M + 0.01), null, 'and one clearly outside must not');
+});
+
+test('the box is tested in its own frame, not an axis-aligned one', () => {
+  const flat = { xy: [0, 0], w: 2, d: 0.2, h: 1, yaw: 0 };   // two metres along X
+  const turned = { ...flat, yaw: 90 };                       // the same, along Y
+  // A ray along +X, half a metre off the centre line: past the end of the flat
+  // box's 10 cm depth, and squarely through the middle of the turned one.
+  assert.equal(rayBox(flat, [-5, 0.5, 0.5], [1, 0, 0], 0), null);
+  assert.ok(rayBox(turned, [-5, 0.5, 0.5], [1, 0, 0], 0) !== null);
+});
+
+test('the box stands on the floor it was given, not on zero', () => {
+  // The scanned rooms this was built for sit at 108 and 171 mm. A ray under the
+  // raised floor must miss the box that stands on it.
+  assert.equal(rayBox(unit, [0, -5, 0.05], [0, 1, 0], 0.171), null);
+  assert.ok(rayBox(unit, [0, -5, 0.05 + 0.171], [0, 1, 0], 0.171) !== null);
+});
+
+test('a ray parallel to a face and outside it is a miss, not a divide by zero', () => {
+  // Straight down, well off to the side: the X and Y slabs are parallel to the
+  // ray and the guard has to answer from position alone.
+  assert.equal(rayBox(unit, [4, 0, 3], [0, 0, -1], 0), null);
+  const t = rayBox(unit, [0, 0, 3], [0, 0, -1], 0);
+  assert.ok(Math.abs(t - (3 - 1 - PICK.PAD_M)) < 1e-9, `landed on the top at ${t}`);
+});
+
+test('the nearer of two boxes is the one picked', () => {
+  const near = { ...unit, xy: [0, 0] };
+  const far = { ...unit, xy: [0, 6] };
+  assert.equal(pickBox([far, near], [0, -5, 0.5], [0, 1, 0], 0), 1);
+  assert.equal(pickBox([near, far], [0, -5, 0.5], [0, 1, 0], 0), 0);
+});
+
+test('among boxes at the same depth the smaller one wins', () => {
+  // A tray on a counter: the tray is inside the counter's volume, so depth alone
+  // would make the tray unselectable for good.
+  const counter = { xy: [0, 0], w: 2, d: 1, h: 0.9, yaw: 0 };
+  const tray = { xy: [0, -0.3], w: 0.4, d: 0.3, h: 0.1, yaw: 0 };
+  assert.equal(pickBox([counter, tray], [0, -5, 0.05], [0, 1, 0], 0), 1);
+});
+
+test('a box further back than the coincidence window does not steal the click', () => {
+  const front = { xy: [0, 0], w: 2, d: 1, h: 1, yaw: 0 };
+  // Small, and beyond COINCIDENT_M behind the front box's entry face.
+  const behind = { xy: [0, 2], w: 0.2, d: 0.2, h: 1, yaw: 0 };
+  assert.equal(pickBox([front, behind], [0, -5, 0.5], [0, 1, 0], 0), 0);
+});
+
+test('empty slots are skipped so the array can be indexed like the object list', () => {
+  const boxes = [null, undefined, { xy: null }, unit];
+  assert.equal(pickBox(boxes, [0, -5, 0.5], [0, 1, 0], 0), 3);
+  assert.equal(pickBox([null, { xy: null }], [0, -5, 0.5], [0, 1, 0], 0), -1);
+  assert.equal(pickBox([], [0, -5, 0.5], [0, 1, 0], 0), -1);
+});
+
+test('a click on the floor plane lands where the ray crosses it', () => {
+  const p = rayPlaneZ([0, 0, 2], [0, 1, -1], 0.5);
+  assert.ok(Math.abs(p[0]) < 1e-12 && Math.abs(p[1] - 1.5) < 1e-12, `landed at ${p}`);
+  // The floor is where the annotation sits, not where the world happens to be flat.
+  const raised = rayPlaneZ([0, 0, 2], [0, 1, -1], 0.171);
+  assert.ok(Math.abs(raised[1] - 1.829) < 1e-12);
+});
+
+test('a ray that never reaches the floor plane says so', () => {
+  assert.equal(rayPlaneZ([0, 0, 2], [0, 1, 0], 0), null, 'parallel to the plane');
+  assert.equal(rayPlaneZ([0, 0, 2], [0, 1, 0.5], 0), null, 'looking up, away from it');
+  assert.equal(rayPlaneZ([0, 0, 2], [0, 1, -1], 2), null, 'the plane is at the eye');
+});
+
+test('a height drag reads the closest approach to the box axis', () => {
+  // Worked by hand: the ray from (0, 0, 2) along (0, 1, -0.5) is nearest the
+  // vertical axis through (0, 2) where it passes over that point, at z = 1.
+  const t = axisHeight([0, 0, 2], [0, 1, -0.5], 0, 2, 0);
+  assert.ok(Math.abs(t - 1) < 1e-12, `closest approach came back at ${t}`);
+  // And the answer is measured from the floor, not from world zero.
+  assert.ok(Math.abs(axisHeight([0, 0, 2], [0, 1, -0.5], 0, 2, 0.3) - 0.7) < 1e-12);
+});
+
+test('a ray along the axis has no one height, and says null rather than a number', () => {
+  assert.equal(axisHeight([0, 0, 3], [0, 0, -1], 0, 0, 0), null);
+  assert.equal(axisHeight([1, 1, 3], [0, 0, 1], 0, 0, 0), null, 'off the axis but still vertical');
+});
+
+test('a yaw is reduced to the half turn that names the same rectangle', () => {
+  assert.equal(normYaw180(0), 0);
+  assert.equal(normYaw180(45), 45);
+  assert.equal(normYaw180(-45), -45);
+  assert.equal(normYaw180(89), 89);
+  assert.equal(normYaw180(180), 0);
+  assert.equal(normYaw180(-180), 0);
+  assert.equal(normYaw180(135), -45);
+  // The one arbitrary choice, pinned here: a box turned a quarter turn either
+  // way is the same box, and this is the end of the interval it is reported at.
+  assert.equal(normYaw180(90), -90);
+  assert.equal(normYaw180(-90), -90);
+  assert.equal(normYaw180(270), -90);
+});
+
+test('every yaw lands inside the slider, and names the same rectangle it started as', () => {
+  for (let deg = -720; deg <= 720; deg += 3.5) {
+    const out = normYaw180(deg);
+    assert.ok(out >= -90 && out < 90, `${deg} came back as ${out}, off the slider`);
+    const turns = (deg - out) / 180;
+    assert.ok(Math.abs(turns - Math.round(turns)) < 1e-9,
+      `${deg} -> ${out} is not a whole number of half turns`);
+  }
+});
+
+test('a corner drag in 3D stops short of the size a typed number may still ask for', () => {
+  // Two floors on purpose: a pixel is millimetres in the top-down view and
+  // centimetres at arm's length in 3D.
+  const box = { xy: [0, 0], w: 1, d: 1, yaw: 0 };
+  const pin = corners(box)[2];
+  const tiny = resizeFromCorner(box, pin, pin[0], pin[1], HANDLE.MIN_SIDE_M);
+  assert.equal(tiny.w, HANDLE.MIN_SIDE_M);
+  assert.equal(resizeFromCorner(box, pin, pin[0], pin[1]).w, 0.05, 'the default floor is unchanged');
 });
 
 test('path length is the polyline, and is zero for fewer than two points', () => {

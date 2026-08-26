@@ -28,6 +28,10 @@ export function keysFor(scene, baseline) {
     added: `${base}:${baseline}:added`,
     routes: `${base}:routes`,
     lang: `${PREFIX}:lang`,
+    // Scoped to neither scene nor baseline, like the language: "show me only the
+    // object I am working on" is a fact about how someone reads a 3D view, not
+    // about the room they happen to have open.
+    focus: `${PREFIX}:focus`,
     routePrefix: base,
   };
 }

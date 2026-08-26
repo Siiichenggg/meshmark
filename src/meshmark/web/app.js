@@ -121,6 +121,10 @@ let activeRoute = 0;
 let cur = 0;
 let addMode = false;
 let pathMode = false;
+// Draw and hit-test the current object alone. A room's worth of boxes overlaps
+// in a 3D view from any angle a person can stand at, and the one being edited is
+// the one that has to be legible.
+let focusCur = localStorage.getItem(keys.focus) === '1';
 let filter = 'all';
 let floorZ = SPEC.floor_z_m;
 let topDown = null;
@@ -130,6 +134,11 @@ const OBJ = () => targets.concat(extra);
 const current = () => OBJ()[cur];
 const A = () => ann[current()?.object_id];
 const classOf = (o) => (ann[o.object_id] || {}).cls || o.cls;
+
+/* The box an annotation describes, as plain numbers for geometry.js. Height is
+   defaulted here and nowhere else downstream, so a box drawn 0.9 m tall is the
+   same box the picker and the handles measure. */
+const boxOf = (a) => ({ xy: a.xy, w: a.w, d: a.d, h: a.h || 0.9, yaw: a.yaw || 0 });
 
 /* Indices the current filter shows. Everything that walks the list -- the
    sidebar, Enter, the arrows -- walks this, so during a bulk add pass "next"
@@ -316,6 +325,7 @@ function rebuildOverlay() {
   const showRefs = $('showrefs').checked;
   OBJ().forEach((o, i) => {
     const isCur = i === cur;
+    if (focusCur && !isCur) return;
     const a = ann[o.object_id];
     if (o.reference_xy && showRefs) {
       const [gx, gy] = o.reference_xy;
@@ -348,6 +358,134 @@ function rebuildOverlay() {
       overlay.add(edges);
     }
   });
+
+  buildHandles();
+}
+
+/* ------------------------------------------------------------ 3D handles
+ *
+ * The box under the pointer is edited where it is, rather than by typing numbers
+ * into the panel and looking up to see what happened. Four kinds of grip, one
+ * per thing a box has: where it is, how big it is, which way it faces, how tall
+ * it is.
+ *
+ * They are drawn as sprites with depth testing off. A handle is a promise that a
+ * click there does something, and a handle hidden inside the very object it is
+ * attached to -- which is where a correctly placed box puts all of them -- is a
+ * promise the scan quietly breaks.
+ */
+
+let handles = [];
+let drag3d = null;
+
+/* Rounded where the number is written, not where it is shown. A drag otherwise
+   writes 0.7300000000000001 into the export, and the panel, rounded for display,
+   agrees with none of it. Millimetres for the floor plan, centimetres for height:
+   a height read off a ray at arm's length does not carry a millimetre. */
+const mm = (v) => Math.round(v * 1000) / 1000;
+const cm = (v) => Math.round(v * 100) / 100;
+
+function handleTexture(colour, path, hole = 0) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.translate(32, 32);
+  path(g);
+  // Outline first and wider, so it reads as a rim rather than covering the fill.
+  // Without it a white dot on a white wall is invisible in exactly the scans
+  // where placing a box is already hardest.
+  g.lineWidth = 7;
+  g.strokeStyle = '#0d0f12';
+  g.stroke();
+  g.fillStyle = colour;
+  g.fill();
+  if (hole) {
+    g.globalCompositeOperation = 'destination-out';
+    g.beginPath();
+    g.arc(0, 0, hole, 0, 7);
+    g.fill();
+  }
+  return new THREE.CanvasTexture(c);
+}
+
+const handleMaterial = (colour, path, hole) => new THREE.SpriteMaterial({
+  map: handleTexture(colour, path, hole),
+  depthTest: false, depthWrite: false, transparent: true,
+});
+
+const HANDLE_MATERIALS = {
+  move: handleMaterial('#ffffff', (g) => { g.beginPath(); g.arc(0, 0, 19, 0, 7); }),
+  corner: handleMaterial('#ffc83d', (g) => { g.beginPath(); g.rect(-17, -17, 34, 34); }),
+  rot: handleMaterial('#35d0ff', (g) => { g.beginPath(); g.arc(0, 0, 20, 0, 7); }, 9),
+  height: handleMaterial('#3ddc84', (g) => {
+    g.beginPath();
+    g.moveTo(0, -22); g.lineTo(22, 0); g.lineTo(0, 22); g.lineTo(-22, 0);
+    g.closePath();
+  }),
+};
+
+const RAIL_MATERIAL = new THREE.LineDashedMaterial({
+  color: 0x3ddc84, dashSize: 0.05, gapSize: 0.04, transparent: true, opacity: 0.7,
+  depthTest: false,
+});
+
+/** Where each handle sits in the world, for one annotation. */
+function handlePoints(a) {
+  const z = floorZ + G.HANDLE.LIFT_M;
+  const [cx, cy] = a.xy;
+  const out = [{ kind: 'move', at: [cx, cy, z] }];
+  G.corners(a).forEach((p, i) => out.push({ kind: 'corner', i, at: [p[0], p[1], z] }));
+  // Outside the box, along the direction yaw actually names, so which way the
+  // grip travels and which way the box turns are the same question.
+  const r = ((a.yaw || 0) * Math.PI) / 180;
+  const reach = a.w / 2 + G.HANDLE.ROTATE_OUT_M;
+  out.push({ kind: 'rot', at: [cx + reach * Math.cos(r), cy + reach * Math.sin(r), z] });
+  out.push({ kind: 'height', at: [cx, cy, floorZ + (a.h || 0.9)] });
+  return out;
+}
+
+function buildHandles() {
+  handles = [];
+  const a = A();
+  if (!a || !a.xy) return;
+
+  // The rail is not decoration. A height drag moves the pointer across the
+  // screen and the box grows upward, and without a line saying which axis the
+  // drag runs along, that reads as the tool doing something else entirely.
+  const rail = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(a.xy[0], a.xy[1], floorZ),
+      new THREE.Vector3(a.xy[0], a.xy[1], floorZ + (a.h || 0.9)),
+    ]),
+    RAIL_MATERIAL
+  );
+  rail.computeLineDistances();   // a dashed line without this draws solid
+  rail.renderOrder = 19;
+  overlay.add(rail);
+
+  for (const p of handlePoints(a)) {
+    const sprite = new THREE.Sprite(HANDLE_MATERIALS[p.kind]);
+    sprite.position.set(p.at[0], p.at[1], p.at[2]);
+    sprite.renderOrder = 20;
+    overlay.add(sprite);
+    handles.push({ ...p, sprite });
+  }
+}
+
+/* Handles are sized in pixels, per frame, rather than in metres once.
+ *
+ * A sprite given a fixed world size is a fixed target only at one distance: back
+ * off to see a whole room and the grips shrink below the radius that grabs them,
+ * so the drag stops working at exactly the zoom level where someone is looking
+ * for the object to drag. */
+function sizeHandles() {
+  if (!handles.length) return;
+  const px = renderer.domElement.clientHeight || 1;
+  const perPixel = (2 * Math.tan((camera.fov * Math.PI) / 360)) / px;
+  for (const h of handles) {
+    const s = G.HANDLE.DRAW_PX * perPixel * camera.position.distanceTo(h.sprite.position);
+    h.sprite.scale.set(s, s, 1);
+  }
 }
 
 function frame() {
@@ -399,8 +537,30 @@ function resize3d() {
 (function loop() {
   requestAnimationFrame(loop);
   controls.update();
+  sizeHandles();
   renderer.render(scene, camera);
 })();
+
+/** The ray through a pointer event, as plain arrays for geometry.js. */
+function rayThrough(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(new THREE.Vector2(
+    ((e.clientX - r.left) / r.width) * 2 - 1,
+    -((e.clientY - r.top) / r.height) * 2 + 1
+  ), camera);
+  const { origin, direction } = ray.ray;
+  return { ray, origin: [origin.x, origin.y, origin.z], dir: [direction.x, direction.y, direction.z] };
+}
+
+/* Every placed box, indexed like the object list, for the picker. Focus mode
+   hands it one box: hit-testing boxes nobody can see moves the selection to
+   something off-screen, and the click that did it looks like a miss. */
+const pickTargets = () => OBJ().map((o, i) => {
+  if (focusCur && i !== cur) return null;
+  const a = ann[o.object_id];
+  return a && a.xy ? boxOf(a) : null;
+});
 
 /* click on the mesh places the object; an orbit drag must not */
 let down = null;
@@ -412,17 +572,176 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
   down = null;
   if (moved > 4) return;
-  const r = renderer.domElement.getBoundingClientRect();
-  const ray = new THREE.Raycaster();
-  ray.setFromCamera(new THREE.Vector2(
-    ((e.clientX - r.left) / r.width) * 2 - 1,
-    -((e.clientY - r.top) / r.height) * 2 + 1
-  ), camera);
+  const { ray, origin, dir } = rayThrough(e);
+
+  /* In add and route mode a click means "make something here", so it is answered
+     before anything is picked -- otherwise a room that already has boxes in it
+     eats the clicks meant to add the next one. */
+  if (!addMode && !pathMode) {
+    const hit = G.pickBox(pickTargets(), origin, dir, floorZ);
+    if (hit >= 0) {
+      // No frame() on purpose: the object is under the pointer already, and a
+      // camera that jumps on selection loses the view someone just orbited to.
+      // The top-down view does follow, or the panel edits an object it is not
+      // showing.
+      cur = hit;
+      planFocus();
+      redraw();
+      return;
+    }
+  }
+
   const hits = ray.intersectObjects(roomMeshes, true)
     // Geometry the cut hides is not visible, so it must not be clickable.
     .filter((h) => h.point.z <= clipPlane.constant);
-  if (hits.length) place(hits[0].point.x, hits[0].point.y);
+  if (!hits.length) return;
+
+  /* A click on bare mesh places an object that has nowhere to be. It used to
+     place one that already did, which meant a single stray click on the far wall
+     silently teleported a box someone had spent a minute fitting -- and the
+     status stayed "corrected", so the record looked deliberate. Moving a placed
+     box is now something you have to grab it to do. */
+  const a = A();
+  if (!addMode && !pathMode && a && a.xy) return;
+  place(hits[0].point.x, hits[0].point.y);
 });
+
+/* ------------------------------------------------------------- 3D dragging */
+
+/** The handle under a screen point, or null. Projected now, not when drawn. */
+function handleAt(clientX, clientY) {
+  const r = renderer.domElement.getBoundingClientRect();
+  const v = new THREE.Vector3();
+  let best = null, closest = G.HANDLE.GRAB_PX;
+  for (const h of handles) {
+    v.set(h.at[0], h.at[1], h.at[2]).project(camera);
+    // Behind the camera, where the projection mirrors the point into view.
+    if (v.z > 1) continue;
+    const d = Math.hypot(
+      r.left + (v.x * 0.5 + 0.5) * r.width - clientX,
+      r.top + (0.5 - v.y * 0.5) * r.height - clientY
+    );
+    if (d < closest) { closest = d; best = h; }
+  }
+  return best;
+}
+
+function dragHandle(e) {
+  const a = A();
+  if (!a || !a.xy) return;
+  const { origin, dir } = rayThrough(e);
+
+  if (drag3d.kind === 'height') {
+    // The one drag that does not go through the floor plane: it rides the box's
+    // own vertical axis, so it keeps working with the pointer above the horizon,
+    // where the floor is behind the viewer and there is no floor point at all.
+    const t = G.axisHeight(origin, dir, a.xy[0], a.xy[1], floorZ);
+    if (t === null) return;
+    a.h = Math.min(G.HANDLE.HEIGHT_MAX_M, Math.max(G.HANDLE.HEIGHT_MIN_M, cm(t)));
+    // Where a height came from is exported, and a dragged one is neither the
+    // class default nor a typed measurement.
+    a.hDragged = true;
+  } else {
+    const p = G.rayPlaneZ(origin, dir, floorZ);
+    if (!p) return;
+    if (drag3d.kind === 'move') {
+      a.xy = [mm(p[0]), mm(p[1])];
+    } else if (drag3d.kind === 'rot') {
+      a.yaw = +G.normYaw180((Math.atan2(p[1] - a.xy[1], p[0] - a.xy[0]) * 180) / Math.PI).toFixed(1);
+    } else if (drag3d.kind === 'corner') {
+      Object.assign(a, G.resizeFromCorner(a, drag3d.pin, p[0], p[1], G.HANDLE.MIN_SIDE_M));
+      a.w = mm(a.w); a.d = mm(a.d);
+      a.xy = [mm(a.xy[0]), mm(a.xy[1])];
+    }
+  }
+  touch();
+  redraw();
+}
+
+/* The capture phase, and stopImmediatePropagation, are both load-bearing:
+   OrbitControls listens for pointerdown on this same canvas, and a drag that
+   edits the box and orbits the camera at once is unusable. Disabling the
+   controls alone is not enough -- they have already taken the press. */
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  const a = A();
+  if (!a || !a.xy) return;
+  const grabbed = handleAt(e.clientX, e.clientY);
+  if (!grabbed) return;
+
+  pushUndo();
+  drag3d = {
+    kind: grabbed.kind,
+    // Captured once, here, as a world point. See geometry.resizeFromCorner for
+    // what re-deriving "the opposite corner" every frame does to a drag that
+    // crosses it.
+    pin: grabbed.kind === 'corner' ? G.corners(a)[(grabbed.i + 2) % 4] : null,
+  };
+  controls.enabled = false;
+  renderer.domElement.setPointerCapture(e.pointerId);
+  e.stopImmediatePropagation();
+  e.preventDefault();
+}, true);
+
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (!drag3d) return;
+  dragHandle(e);
+  e.stopImmediatePropagation();
+}, true);
+
+for (const kind of ['pointerup', 'pointercancel']) {
+  renderer.domElement.addEventListener(kind, (e) => {
+    if (!drag3d) return;
+    drag3d = null;
+    controls.enabled = true;
+    // The press that began the drag never reached the click path; make sure the
+    // release does not either, or letting go of a handle also places the object.
+    down = null;
+    e.stopImmediatePropagation();
+  }, true);
+}
+
+/* ---------------------------------------------------------------- undo
+ *
+ * One stack for the whole session, holding whole annotations rather than deltas:
+ * an edit here is a handful of numbers, and a snapshot cannot disagree with what
+ * it is undoing. Routes are not in it -- they have their own undo button, and a
+ * single Ctrl+Z that sometimes means "put the waypoint back" and sometimes means
+ * "put the box back" is worse than either.
+ */
+const UNDO_LIMIT = 60;
+const undoStack = [];
+
+function pushUndo() {
+  const o = current();
+  if (!o) return;
+  const a = ann[o.object_id];
+  undoStack.push({ id: o.object_id, ann: a ? structuredClone(a) : null });
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+}
+
+function undo() {
+  while (undoStack.length) {
+    const step = undoStack.pop();
+    // An added box that was relabelled is re-minted under a new object_id, so an
+    // entry from before the rename names nothing on the list. Restoring it would
+    // write a key no view ever reads; skip to the next entry instead.
+    const at = OBJ().findIndex((o) => o.object_id === step.id);
+    if (at < 0) continue;
+    if (step.ann) ann[step.id] = step.ann; else delete ann[step.id];
+    // Undo selects what it just restored. A verdict advances the pass by itself,
+    // so the object being undone is almost never the one on screen: leaving the
+    // selection alone put the change on one object and the panel on another, and
+    // read as the undo having done nothing. Selecting outside the current filter
+    // is deliberate, and matches what picking a box in the 3D view already does.
+    cur = at;
+    touch();
+    frame();
+    planFocus();
+    redraw();
+    return;
+  }
+}
 
 /* ------------------------------------------------------------------- topDown */
 
@@ -464,6 +783,7 @@ function drawPlan() {
   const showRefs = $('showrefs').checked;
   OBJ().forEach((o, i) => {
     const isCur = i === cur;
+    if (focusCur && !isCur) return;
     const a = ann[o.object_id];
     let gx = null, gy = null;
     if (o.reference_xy && showRefs) {
@@ -620,6 +940,7 @@ function place(x, y) {
   if (addMode) { addObject(x, y); return; }
   const o = current();
   if (!o) return;
+  pushUndo();
   const a = ann[o.object_id] || {};
   if (!a.xy) {
     const [w, d, h] = clsSize(classOf(o));
@@ -674,6 +995,7 @@ function removeObject(i) {
 function setClass(clsId) {
   const o = current();
   if (!o) return;
+  pushUndo();
   const a = (ann[o.object_id] = ann[o.object_id] || {});
   if (clsId === o.cls) delete a.cls; else a.cls = clsId;
 
@@ -704,9 +1026,14 @@ function setClass(clsId) {
 function setStatus(s) {
   const o = current();
   if (!o) return;
+  // Confirming an object that has no reference is not a verdict anyone can act
+  // on, so this call does nothing at all -- and doing nothing must leave no
+  // trace: no empty annotation record, and above all no undo entry, which would
+  // otherwise make the next Ctrl+Z appear to be ignored.
+  if (s === 'confirmed' && !o.reference_xy) return;
+  pushUndo();
   const a = (ann[o.object_id] = ann[o.object_id] || {});
   if (s === 'confirmed') {
-    if (!o.reference_xy) return;
     // "The reference was right" has to mean the reference's own coordinates.
     // Leaving a dragged position under a confirmed status produced a record that
     // contradicted itself and needed a human to adjudicate.
@@ -719,7 +1046,12 @@ function setStatus(s) {
   }
   if (s === 'absent') delete a.xy;
   a.status = s;
-  touch(); redraw();
+  touch();
+  // A verdict is the end of one object's turn, so the pass moves on by itself.
+  // Reaching for "next" after every single judgement is the whole cost of a
+  // hundred-object round, and it is paid one click at a time.
+  if (s === 'confirmed' || s === 'absent') stepUntouched();
+  redraw();
 }
 
 function step(n) {
@@ -728,6 +1060,24 @@ function step(n) {
   const at = vis.indexOf(cur);
   cur = vis[((at < 0 ? 0 : at + n) + vis.length) % vis.length];
   frame(); planFocus(); redraw();
+}
+
+/* The next object in this view that nobody has ruled on yet, wrapping once.
+   Stays put when there is none: at the end of a pass, being dropped back at the
+   first object reads as the tool having lost the work. */
+function stepUntouched() {
+  const objs = OBJ();
+  const vis = visible();
+  if (!vis.length) return;
+  const at = Math.max(0, vis.indexOf(cur));
+  for (let k = 1; k <= vis.length; k++) {
+    const i = vis[(at + k) % vis.length];
+    if (!(ann[objs[i].object_id] || {}).status) {
+      cur = i;
+      frame(); planFocus();
+      return;
+    }
+  }
 }
 
 function setFilter(f) {
@@ -960,12 +1310,15 @@ function buildExport() {
           depth_m: +a.d.toFixed(3),
           height_m: +(a.h || nominal).toFixed(3),
           yaw_deg: a.yaw || 0,
-          // Width, depth and yaw are dragged onto the object. Height is not:
-          // nothing in either view measures it, so it starts as the class
-          // default and stays there unless someone types a number. Saying which
-          // it is here is the difference between a measurement and a guess that
-          // gets cited as one.
-          height_source: Math.abs((a.h || nominal) - nominal) < 1e-6 ? 'class default' : 'entered by hand',
+          // Three ways a height gets its number, and they are not equally good.
+          // Dragged against the mesh on the vertical rail is a measurement of
+          // the object; typed is a measurement of something, made elsewhere;
+          // the class default is a guess that has never been looked at. Saying
+          // which is the difference between a figure and a figure that gets
+          // cited as one.
+          height_source: a.hDragged
+            ? 'dragged in 3D'
+            : (Math.abs((a.h || nominal) - nominal) < 1e-6 ? 'class default' : 'entered by hand'),
         };
         if (o.reference_xy) {
           out.offset_m = +Math.hypot(
@@ -1027,6 +1380,9 @@ function applyRound(d) {
       a.d = b.depth_m ?? 0.5;
       a.h = b.height_m ?? 0.9;
       a.yaw = b.yaw_deg ?? 0;
+      // Carried back in, or a round trip through a file turns a height somebody
+      // measured against the mesh into one the export calls typed.
+      if (b.height_source === 'dragged in 3D') a.hDragged = true;
     }
     ann[o.object_id] = a;
   }
@@ -1070,6 +1426,12 @@ $('routedel').onclick = deleteRoute;
 $('routerename').onclick = renameRoute;
 $('routesel').onchange = (e) => { activeRoute = +e.target.value; redraw(); };
 $('showrefs').onchange = redraw;
+$('focuscur').checked = focusCur;
+$('focuscur').onchange = () => {
+  focusCur = $('focuscur').checked;
+  localStorage.setItem(keys.focus, focusCur ? '1' : '0');
+  redraw();
+};
 $('exportbtn').onclick = exportJson;
 $('importbtn').onclick = () => $('imp').click();
 $('imp').onchange = importJson;
@@ -1088,17 +1450,39 @@ $('note').oninput = (e) => {
   const o = current();
   if (o) { (ann[o.object_id] = ann[o.object_id] || {}).note = e.target.value; touch(); }
 };
+/* One undo entry per gesture, not per keystroke.
+ *
+ * Typing 1.25 into a width field fires four input events, and a stack that took
+ * all four spends four Ctrl+Z getting back to where the object was before the
+ * number was typed -- by which point the person pressing it has no idea how many
+ * more are left. A gesture starts at the first edit after the field is focused
+ * and ends when focus leaves. */
+let editGesture = null;
+function beginEdit(el) {
+  if (editGesture === el) return;
+  editGesture = el;
+  pushUndo();
+}
+for (const id of ['w', 'd', 'h', 'yaw']) {
+  $(id).addEventListener('focus', () => { editGesture = null; });
+  $(id).addEventListener('blur', () => { editGesture = null; });
+}
+
 $('yaw').oninput = (e) => {
   const a = A();
-  if (a && a.xy) { a.yaw = +e.target.value; touch(); redraw(); }
+  if (a && a.xy) { beginEdit($('yaw')); a.yaw = +e.target.value; touch(); redraw(); }
 };
 for (const id of ['w', 'd', 'h']) {
   $(id).oninput = () => {
     const a = A();
     if (!a || !a.xy) return;
-    a.w = Math.max(0.05, +$('w').value || a.w);
-    a.d = Math.max(0.05, +$('d').value || a.d);
-    a.h = Math.max(0.05, +$('h').value || a.h || 0.9);
+    beginEdit($(id));
+    a.w = Math.max(G.BOX.MIN_SIDE_M, +$('w').value || a.w);
+    a.d = Math.max(G.BOX.MIN_SIDE_M, +$('d').value || a.d);
+    a.h = Math.max(G.BOX.MIN_SIDE_M, +$('h').value || a.h || 0.9);
+    // A typed height is a different claim from a dragged one, and the export
+    // says which: retyping the number has to take the mark off.
+    if (id === 'h') delete a.hDragged;
     touch(); redraw();
   };
 }
@@ -1117,6 +1501,11 @@ $('cut').addEventListener('change', () => { buildTopDown(); redraw(); });
 
 addEventListener('keydown', (e) => {
   if (['TEXTAREA', 'INPUT', 'SELECT'].includes(e.target.tagName)) return;
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+    e.preventDefault();
+    undo();
+    return;
+  }
   const a = A();
   const big = e.shiftKey ? 0.1 : 0.01;
   const n = { ArrowLeft: [-big, 0], ArrowRight: [big, 0], ArrowUp: [0, big], ArrowDown: [0, -big] }[e.key];
@@ -1187,8 +1576,13 @@ window.__meshmark = {
   get routes() { return routes; },
   get cur() { return cur; },
   get lang() { return lang; },
+  get focusCur() { return focusCur; },
+  // The handles as the picker sees them, not as they are drawn: a click test
+  // run from outside the page is the only way to check the grab radius without
+  // a hand on a mouse.
+  get handles() { return handles.map(({ kind, i, at }) => ({ kind, i, at })); },
   mapping,
-  place, step, setStatus, setClass, setLanguage, buildExport, applyRound, redraw,
+  place, step, setStatus, setClass, setLanguage, buildExport, applyRound, redraw, undo,
   // What the ResizeObserver calls. Exposed because the observer is delivered on
   // the event loop's rendering steps, which a hidden page does not run -- so in
   // a headless or background tab the sizing path cannot be triggered from
